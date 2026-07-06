@@ -80,7 +80,7 @@
     <button class="btn" id="btnSaveProj">&#128190; Save Project</button>
     <button class="btn primary" id="btnExport">Export PNG</button>
     <input type="file" id="fileInput" accept="image/*">
-    <input type="file" id="projInput" accept=".bpmark,.json,application/json">
+    <input type="file" id="projInput" accept="application/json,.json,.bpmark,text/plain">
   </div>
 
   <div id="palette"></div>
@@ -112,9 +112,10 @@
   <img id="exportImg" alt="Exported plan">
   <div class="row">
     <a class="btn primary" id="exportDownload" download="block-plan-marked.png">&#11015; Download PNG</a>
+    <button class="btn" id="exportShare" style="display:none">&#8682; Share&#8230;</button>
     <button class="btn" id="exportClose">Close</button>
   </div>
-  <div class="hint">The PNG is flattened (not editable). To share an editable version, use <b>Save Project</b> and send that file with this tool.<br>If download doesn't start (some phones): press &amp; hold the image and choose "Save Image".</div>
+  <div class="hint">The PNG is flattened (not editable). To share an editable version, use <b>Save Project</b> and send that file with this tool.<br>On iPad/iPhone use <b>Share&#8230;</b> to save to Files, AirDrop or message it. If all else fails: press &amp; hold the image and choose "Save Image".</div>
 </div>
 
 <script>
@@ -435,11 +436,17 @@ window.addEventListener("paste", e => {
 document.getElementById("btnSaveProj").onclick = () => {
   if (!img) { alert("Load a block plan photo first."); return; }
   const proj = { app:"block-plan-marker", version:2, image:imgDataUrl, objects:objects };
+  const name = "block-plan-project-" + new Date().toISOString().slice(0, 10) + ".json";
   const blob = new Blob([JSON.stringify(proj)], { type:"application/json" });
+  const file = new File([blob], name, { type:"application/json" });
+  if (canShareFile(file)) {
+    navigator.share({ files:[file], title:name }).catch(() => {});
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "block-plan-project-" + new Date().toISOString().slice(0, 10) + ".bpmark";
+  a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 };
@@ -777,6 +784,15 @@ const exportPanel = document.getElementById("exportPanel");
 const exportImg = document.getElementById("exportImg");
 const exportDownload = document.getElementById("exportDownload");
 let lastBlobUrl = null;
+let lastExportBlob = null;
+function isMobileShare() {
+  const ua = navigator.userAgent;
+  const iOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  return iOS || /Android/.test(ua);
+}
+function canShareFile(file) {
+  return isMobileShare() && navigator.canShare && navigator.canShare({ files: [file] });
+}
 
 document.getElementById("btnExport").onclick = () => {
   if (!img) { alert("Load a block plan photo first."); return; }
@@ -788,14 +804,23 @@ document.getElementById("btnExport").onclick = () => {
   exportDownload.href = dataUrl;
   out.toBlob(blob => {
     if (blob) {
+      lastExportBlob = blob;
       lastBlobUrl = URL.createObjectURL(blob);
       exportDownload.href = lastBlobUrl;
+      const f = new File([blob], "plan.png", { type:"image/png" });
+      document.getElementById("exportShare").style.display = canShareFile(f) ? "inline-block" : "none";
     }
   }, "image/png");
 
   const stamp = new Date().toISOString().slice(0, 10);
   exportDownload.setAttribute("download", "block-plan-marked-" + stamp + ".png");
   exportPanel.classList.add("show");
+};
+document.getElementById("exportShare").onclick = () => {
+  if (!lastExportBlob) return;
+  const stamp = new Date().toISOString().slice(0, 10);
+  const f = new File([lastExportBlob], "block-plan-marked-" + stamp + ".png", { type:"image/png" });
+  navigator.share({ files:[f] }).catch(() => {});
 };
 document.getElementById("exportClose").onclick = () => exportPanel.classList.remove("show");
 
