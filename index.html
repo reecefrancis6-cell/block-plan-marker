@@ -69,7 +69,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v7</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v8</span></span>
     <button class="btn" id="btnPhoto">&#128247; Photo / Image</button>
     <button class="btn" id="btnOpenProj">&#128194; Open PDF / Project</button>
     <button class="btn" id="btnUndo" title="Undo (Ctrl+Z)">&#8630; Undo</button>
@@ -78,7 +78,7 @@
     <button class="btn" id="btnFit">Fit</button>
     <span class="spacer"></span>
     <button class="btn" id="btnSaveProj">&#128190; Save Project</button>
-    <button class="btn primary" id="btnExport">Export PNG</button>
+    <button class="btn primary" id="btnExport">&#11015; Export</button>
     <input type="file" id="fileInput" accept="image/*">
     <input type="file" id="projInput">
   </div>
@@ -111,12 +111,11 @@
 <div id="exportPanel">
   <img id="exportImg" alt="Exported plan">
   <div class="row">
-    <a class="btn primary" id="exportDownload" download="block-plan-marked.png">&#11015; Download PNG</a>
-    <button class="btn" id="exportPdf">&#128196; PDF</button>
-    <button class="btn" id="exportShare" style="display:none">&#8682; Share&#8230;</button>
+    <button class="btn primary" id="exportPng">&#11015; Save as PNG</button>
+    <button class="btn" id="exportPdf">&#128196; Save as PDF</button>
     <button class="btn" id="exportClose">Close</button>
   </div>
-  <div class="hint">The PNG is flattened (not editable). To share an editable version, use <b>Save Project</b> and send that file with this tool.<br>On iPad/iPhone use <b>Share&#8230;</b> to save to Files, AirDrop or message it. If all else fails: press &amp; hold the image and choose "Save Image".</div>
+  <div class="hint">PNG for quick sharing, PDF for Bluebeam. Both are flattened (not editable) &mdash; for an editable copy use <b>Save Project</b>.<br>On iPad/iPhone, saving opens the share sheet: choose Save to Files, AirDrop, or send it to someone.</div>
 </div>
 
 <script>
@@ -842,8 +841,6 @@ function renderExportCanvas() {
 
 const exportPanel = document.getElementById("exportPanel");
 const exportImg = document.getElementById("exportImg");
-const exportDownload = document.getElementById("exportDownload");
-let lastBlobUrl = null;
 let lastExportBlob = null;
 function isMobileShare() {
   const ua = navigator.userAgent;
@@ -854,34 +851,37 @@ function canShareFile(file) {
   return isMobileShare() && navigator.canShare && navigator.canShare({ files: [file] });
 }
 
+function deliverFile(blob, name, mime) {
+  const file = new File([blob], name, { type: mime });
+  if (canShareFile(file)) {
+    navigator.share({ files: [file], title: name }).catch(() => {});
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function exportName(ext) {
+  return "block-plan-marked-" + new Date().toISOString().slice(0, 10) + "." + ext;
+}
+
 document.getElementById("btnExport").onclick = () => {
   if (!img) { alert("Load a block plan photo first."); return; }
   const out = renderExportCanvas();
-  const dataUrl = out.toDataURL("image/png");
-  exportImg.src = dataUrl;
-
-  if (lastBlobUrl) { URL.revokeObjectURL(lastBlobUrl); lastBlobUrl = null; }
-  exportDownload.href = dataUrl;
-  out.toBlob(blob => {
-    if (blob) {
-      lastExportBlob = blob;
-      lastBlobUrl = URL.createObjectURL(blob);
-      exportDownload.href = lastBlobUrl;
-      const f = new File([blob], "plan.png", { type:"image/png" });
-      document.getElementById("exportShare").style.display = canShareFile(f) ? "inline-block" : "none";
-    }
-  }, "image/png");
-
-  const stamp = new Date().toISOString().slice(0, 10);
-  exportDownload.setAttribute("download", "block-plan-marked-" + stamp + ".png");
+  exportImg.src = out.toDataURL("image/png");
+  lastExportBlob = null;
+  out.toBlob(blob => { lastExportBlob = blob; }, "image/png");
   exportPanel.classList.add("show");
 };
-document.getElementById("exportShare").onclick = () => {
+
+document.getElementById("exportPng").onclick = () => {
   if (!lastExportBlob) return;
-  const stamp = new Date().toISOString().slice(0, 10);
-  const f = new File([lastExportBlob], "block-plan-marked-" + stamp + ".png", { type:"image/png" });
-  navigator.share({ files:[f] }).catch(() => {});
+  deliverFile(lastExportBlob, exportName("png"), "image/png");
 };
+
 document.getElementById("exportClose").onclick = () => exportPanel.classList.remove("show");
 
 /* ================= PDF export (self-contained, no libraries) ================= */
@@ -917,20 +917,9 @@ function canvasToPdfBlob(canvas) {
 }
 
 document.getElementById("exportPdf").onclick = () => {
+  if (!img) return;
   const out = renderExportCanvas();
-  const blob = canvasToPdfBlob(out);
-  const stamp = new Date().toISOString().slice(0, 10);
-  const name = "block-plan-marked-" + stamp + ".pdf";
-  const file = new File([blob], name, { type: "application/pdf" });
-  if (canShareFile(file)) {
-    navigator.share({ files: [file], title: name }).catch(() => {});
-    return;
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  deliverFile(canvasToPdfBlob(out), exportName("pdf"), "application/pdf");
 };
 
 
