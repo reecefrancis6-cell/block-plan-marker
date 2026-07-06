@@ -69,9 +69,9 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v6</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v7</span></span>
     <button class="btn" id="btnPhoto">&#128247; Photo / Image</button>
-    <button class="btn" id="btnOpenProj">&#128194; Open Project</button>
+    <button class="btn" id="btnOpenProj">&#128194; Open PDF / Project</button>
     <button class="btn" id="btnUndo" title="Undo (Ctrl+Z)">&#8630; Undo</button>
     <button class="btn" id="btnZoomOut">&minus;</button>
     <button class="btn" id="btnZoomIn">+</button>
@@ -91,7 +91,7 @@
       <div class="big">Load your block plan photo to start</div>
       <div>Tap <b>&#128247; Photo / Image</b> above (opens camera on phone)<br>
       or drag &amp; drop an image here, or paste with Ctrl+V<br><br>
-      Got a saved project file? Use <b>&#128194; Open Project</b> to keep editing.</div>
+      Got a PDF plan or a saved project file? Use <b>&#128194; Open PDF / Project</b>.</div>
     </div>
   </div>
 
@@ -422,8 +422,7 @@ stage.addEventListener("drop", e => {
   e.preventDefault();
   const f = e.dataTransfer.files && e.dataTransfer.files[0];
   if (!f) return;
-  if (f.name.endsWith(".bpmark") || f.name.endsWith(".json") || f.type === "application/json") loadProjectFile(f);
-  else loadImageFile(f);
+  openAnyFile(f);
 });
 
 window.addEventListener("paste", e => {
@@ -432,6 +431,66 @@ window.addEventListener("paste", e => {
     if (it.type.indexOf("image") === 0) { loadImageFile(it.getAsFile()); break; }
   }
 });
+
+
+/* ================= PDF import (pdf.js, bundled) ================= */
+let pdfjsReady = null;
+function ensurePdfJs() {
+  if (window.pdfjsLib) return Promise.resolve();
+  if (pdfjsReady) return pdfjsReady;
+  pdfjsReady = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "./pdf.min.js";
+    s.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.min.js";
+      resolve();
+    };
+    s.onerror = () => { pdfjsReady = null; reject(new Error("pdf.js failed to load")); };
+    document.head.appendChild(s);
+  });
+  return pdfjsReady;
+}
+
+function loadPdfFile(file) {
+  statusEl.textContent = "Opening PDF\u2026";
+  ensurePdfJs()
+    .then(() => file.arrayBuffer())
+    .then(buf => window.pdfjsLib.getDocument({ data: buf }).promise)
+    .then(async pdf => {
+      let n = 1;
+      if (pdf.numPages > 1) {
+        const a = window.prompt("PDF has " + pdf.numPages + " pages. Open which page?", "1");
+        n = Math.min(pdf.numPages, Math.max(1, parseInt(a || "1", 10) || 1));
+      }
+      const page = await pdf.getPage(n);
+      let vp = page.getViewport({ scale: 1 });
+      const scale = Math.min(4, Math.max(1, 2400 / vp.width));
+      vp = page.getViewport({ scale: scale });
+      const c = document.createElement("canvas");
+      c.width = Math.round(vp.width);
+      c.height = Math.round(vp.height);
+      const cx = c.getContext("2d");
+      cx.fillStyle = "#ffffff";
+      cx.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: cx, viewport: vp }).promise;
+      const dataUrl = c.toDataURL("image/jpeg", 0.92);
+      const im = new Image();
+      im.onload = () => setImage(im, dataUrl, false);
+      im.src = dataUrl;
+    })
+    .catch(err => {
+      updateStatus();
+      alert("Couldn't open that PDF." + (navigator.onLine ? "" : " PDF import needs internet the first time it's used."));
+    });
+}
+
+function openAnyFile(file) {
+  if (!file) return;
+  const name = (file.name || "").toLowerCase();
+  if (file.type === "application/pdf" || name.endsWith(".pdf")) loadPdfFile(file);
+  else if (file.type && file.type.indexOf("image") === 0) loadImageFile(file);
+  else loadProjectFile(file);
+}
 
 /* ================= Project save / open ================= */
 document.getElementById("btnSaveProj").onclick = () => {
@@ -473,7 +532,7 @@ function loadProjectFile(file) {
 }
 document.getElementById("btnOpenProj").onclick = () => document.getElementById("projInput").click();
 document.getElementById("projInput").addEventListener("change", e => {
-  if (e.target.files && e.target.files[0]) loadProjectFile(e.target.files[0]);
+  if (e.target.files && e.target.files[0]) openAnyFile(e.target.files[0]);
   e.target.value = "";
 });
 
