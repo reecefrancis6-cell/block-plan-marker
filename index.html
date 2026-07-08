@@ -79,7 +79,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v10</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v11</span></span>
     <button class="btn" id="btnPhoto">&#128247; Photo</button>
     <button class="btn" id="btnOpenProj">&#128194; Open</button>
     <button class="btn" id="btnUndo" title="Undo (Ctrl+Z)">&#8630;</button>
@@ -89,6 +89,9 @@
     <button class="btn" id="btnFit">Fit all</button>
     <button class="btn" id="btnLabels">&#127991; Labels</button>
     <button class="btn" id="btnZones">Zones</button>
+    <button class="btn" id="btnNotes">&#128221; Notes</button>
+    <button class="btn" id="btnReport">&#128203; Report</button>
+    <button class="btn" id="btnPageSpace" title="Add white space below the plan">Page +</button>
     <span class="spacer"></span>
     <button class="btn" id="btnSaveProj">&#128190; Save</button>
     <button class="btn primary" id="btnExport">&#11015; Export</button>
@@ -114,12 +117,14 @@
   </div>
 
   <div id="bottombar">
-    <div id="sizeWrap">Size <input type="range" id="sizeSlider" min="12" max="120" value="36"></div>
+    <div id="sizeWrap">Size <input type="range" id="sizeSlider" min="0" max="100" value="48"></div>
     <div id="swatches"></div>
     <button class="btn" id="btnDetails" disabled>&#9432; Details</button>
     <button class="btn" id="btnRotate" disabled title="Rotate 90&deg;">&#10227;</button>
     <button class="btn" id="btnFlipH" disabled title="Flip horizontal">&#8644;</button>
     <button class="btn" id="btnFlipV" disabled title="Flip vertical">&#8645;</button>
+    <button class="btn" id="btnHalf" disabled title="Halftone (fade)">&#9681;</button>
+    <button class="btn" id="btnSame" disabled title="Select all of this type">Select same</button>
     <button class="btn" id="btnDup" disabled>Duplicate</button>
     <button class="btn" id="btnDel" disabled>Delete</button>
     <span class="spacer"></span>
@@ -135,6 +140,22 @@
     <label>Loop</label><input type="text" id="dLoop" autocomplete="off">
     <label>Device number</label><input type="text" id="dDev" autocomplete="off">
     <label>Other info</label><input type="text" id="dInfo" autocomplete="off">
+    <div id="dbaFields" style="display:none">
+      <label>A = (dBA)</label><input type="text" id="dVa" autocomplete="off">
+      <label>E = (dBA)</label><input type="text" id="dVe" autocomplete="off">
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;color:#e8e8e8">
+      <input type="checkbox" id="dFailed" style="width:18px;height:18px"> Failed
+    </label>
+    <div id="photoWrap" style="margin-top:10px">
+      <label>Photo</label>
+      <img id="dPhotoPreview" style="display:none;max-width:120px;max-height:120px;border:1px solid #555;border-radius:6px;margin:4px 0">
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="dPhotoAdd">&#128247; Add photo</button>
+        <button class="btn" id="dPhotoRemove" style="display:none">Remove</button>
+      </div>
+      <input type="file" id="dPhotoInput" accept="image/*">
+    </div>
     <div class="row">
       <button class="btn" id="detailsCancel">Cancel</button>
       <button class="btn primary" id="detailsSave">Save</button>
@@ -147,6 +168,42 @@
     <h3>Device count by zone</h3>
     <div id="zonesTable"></div>
     <div class="row"><button class="btn" id="zonesClose">Close</button></div>
+  </div>
+</div>
+
+<div class="modal" id="textModal">
+  <div class="modalbox">
+    <h3>Edit text</h3>
+    <label>Text</label><input type="text" id="tText" autocomplete="off">
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:#e8e8e8">
+      <input type="checkbox" id="tBg" style="width:18px;height:18px"> White background box
+    </label>
+    <div class="row">
+      <button class="btn" id="textCancel">Cancel</button>
+      <button class="btn primary" id="textSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="notesModal">
+  <div class="modalbox">
+    <h3>Site notes</h3>
+    <textarea id="notesText" style="width:100%;height:180px;background:#1a1d21;border:1px solid #444;border-radius:6px;color:#e8e8e8;padding:8px;font-size:14px;font-family:inherit"></textarea>
+    <div class="row">
+      <button class="btn" id="notesCancel">Cancel</button>
+      <button class="btn primary" id="notesSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="reportModal">
+  <div class="modalbox" style="max-width:560px">
+    <h3>Site report</h3>
+    <div id="reportBody" style="font-size:13px"></div>
+    <div class="row">
+      <button class="btn primary" id="reportPdf">&#128196; Save as PDF</button>
+      <button class="btn" id="reportClose">Close</button>
+    </div>
   </div>
 </div>
 
@@ -173,7 +230,10 @@ const TYPES = [
   { id:"fdcie",    tab:"fire", label:"FDCIE",        glyph:"widetext", text:"FDCIE", color:"#c40000" },
   { id:"mcp",      tab:"fire", label:"MCP",          glyph:"sqtext",   text:"MCP",   color:"#c40000" },
   { id:"wip",      tab:"fire", label:"WIP",          glyph:"phone",    text:"",      color:"#c40000" },
-  { id:"sounder",  tab:"fire", label:"Sounder",      glyph:"horn",     text:"",      color:"#e07b00" },
+  { id:"sounder",  tab:"fire", label:"Sounder",      glyph:"sndr",     text:"",      color:"#e07b00" },
+  { id:"horn",     tab:"fire", label:"Horn",         glyph:"horn",     text:"",      color:"#e07b00" },
+  { id:"sm240",    tab:"fire", label:"240V Smoke",   glyph:"sm240",    text:"",      color:"#f2c200" },
+  { id:"dba",      tab:"fire", label:"dBA",          glyph:"dba",      text:"",      color:"#757575" },
   { id:"ows",      tab:"fire", label:"OWS",          glyph:"widetext", text:"OWS",   color:"#c40000" },
   { id:"vesda",    tab:"fire", label:"VESDA",        glyph:"circle",   text:"V",     color:"#7b1fa2" },
   { id:"io",       tab:"fire", label:"Interface",    glyph:"sqtext",   text:"IO",    color:"#546e7a" },
@@ -196,7 +256,11 @@ const MARKUP_TOOLS = [
   { id:"rect",    label:"Rectangle",   icon:"▭" },
   { id:"ellipse", label:"Ellipse",     icon:"⬭" },
   { id:"cloud",   label:"Cloud",       icon:"☁️" },
-  { id:"callout", label:"Callout",     icon:"💬↗" }
+  { id:"callout", label:"Callout",     icon:"💬↗" },
+  { id:"hatchd",  label:"Hatch ▨",     icon:"▨" },
+  { id:"hatchx",  label:"Hatch ▩",     icon:"▩" },
+  { id:"hatchs",  label:"Hatch solid", icon:"■" },
+  { id:"hatcho",  label:"Hatch dots",  icon:"⣿" }
 ];
 const TABS = [
   { id:"fav",    label:"Favourites" },
@@ -221,12 +285,15 @@ let undoStack = [], redoStack = [];
 const MAX_UNDO = 80;
 let fileHandle = null;          // File System Access handle (PC save-in-place)
 let lastSaveNote = "";
+let siteNotes = "";
 
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
 const stage = document.getElementById("stage");
 const statusEl = document.getElementById("status");
 const sizeSlider = document.getElementById("sizeSlider");
+function sizeVal() { return Math.round(12 * Math.pow(10, (+sizeSlider.value) / 100)); }
+function sliderFromSize(s) { return Math.round(100 * Math.log10(Math.max(12, s) / 12)); }
 
 /* ================= Canvas sizing / coords ================= */
 function resizeCanvas() {
@@ -269,6 +336,8 @@ function symDims(o) {   // image-space width/height (before rotation)
   if (t.glyph === "widetext") { w = s * 2.3; h = s; }
   else if (t.glyph === "exit") { w = s * 2.4; h = s * 1.1; }
   else if (t.glyph === "horn") { w = s * 1.7; h = s; }
+  else if (t.glyph === "sndr") { w = s * 1.35; h = s * 0.8; }
+  else if (t.glyph === "dba") { w = s * 1.4; h = s * 1.9; }
   else if (t.glyph === "db") { w = s * 1.9; h = s * 1.15; }
   if ((o.rot || 0) % 180 === 90) { const tmp = w; w = h; h = tmp; }
   return { w, h };
@@ -373,6 +442,61 @@ function drawSym(c, o, scale) {
     c.beginPath(); c.arc(-ex, ey, r * 0.2, 0, Math.PI * 2); c.fill();
     c.beginPath(); c.arc(ex, ey, r * 0.2, 0, Math.PI * 2); c.fill();
     c.restore();
+  } else if (t.glyph === "sndr") {
+    // shorter closed horn (Reece's sounder reference)
+    const w = s * 1.35, h2 = s * 0.8;
+    const sq = h2 * 0.62;
+    c.fillStyle = col; c.strokeStyle = "#333333";
+    c.lineWidth = Math.max(1, s * 0.06);
+    c.beginPath(); c.rect(-w / 2, -sq / 2, sq, sq); c.fill(); c.stroke();
+    c.beginPath();
+    c.moveTo(-w / 2 + sq, -sq / 2 + sq * 0.1);
+    c.lineTo(w / 2, -h2 / 2);
+    c.lineTo(w / 2 - h2 * 0.28, h2 / 2);
+    c.lineTo(-w / 2 + sq, sq / 2 - sq * 0.1);
+    c.closePath(); c.fill(); c.stroke();
+  } else if (t.glyph === "sm240") {
+    // 240V smoke alarm: disc with concentric vent rings + "!" badge
+    const r = s / 2;
+    c.fillStyle = col; c.strokeStyle = "#333333";
+    c.lineWidth = Math.max(1, r * 0.08);
+    c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.strokeStyle = "#ffffff"; c.lineWidth = Math.max(1.2, r * 0.11); c.lineCap = "round";
+    [0.3, 0.52, 0.74].forEach(f => {
+      c.setLineDash([r * 0.28, r * 0.16]);
+      c.beginPath(); c.arc(0, 0, r * f, 0, Math.PI * 2); c.stroke();
+    });
+    c.setLineDash([]);
+    c.fillStyle = "#ffffff";
+    c.beginPath(); c.arc(0, 0, r * 0.12, 0, Math.PI * 2); c.fill();
+    const bx = r * 0.62, by = r * 0.62, br = r * 0.4;
+    c.fillStyle = col;
+    c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = "#ffffff"; c.lineWidth = Math.max(1, br * 0.18);
+    c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.stroke();
+    c.save();
+    c.scale(sx, sy);
+    c.fillStyle = "#ffffff";
+    c.font = "bold " + (br * 1.3) + "px system-ui, sans-serif";
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText("!", sx * bx, sy * by + br * 0.08);
+    c.restore();
+  } else if (t.glyph === "dba") {
+    // speaker with sound waves
+    const w = s * 1.4, h2 = s;
+    c.fillStyle = col; c.strokeStyle = col;
+    c.lineWidth = Math.max(1.2, s * 0.09); c.lineCap = "round";
+    const bx = -w / 2;
+    c.beginPath(); c.rect(bx, -h2 * 0.18, w * 0.2, h2 * 0.36); c.fill();
+    c.beginPath();
+    c.moveTo(bx + w * 0.2, -h2 * 0.16);
+    c.lineTo(bx + w * 0.52, -h2 * 0.5);
+    c.lineTo(bx + w * 0.52, h2 * 0.5);
+    c.lineTo(bx + w * 0.2, h2 * 0.16);
+    c.closePath(); c.fill();
+    [0.32, 0.52, 0.72].forEach(f => {
+      c.beginPath(); c.arc(bx + w * 0.56, 0, w * f * 0.6, -Math.PI / 3.2, Math.PI / 3.2); c.stroke();
+    });
   } else if (t.glyph === "db") {
     const w = s * 1.9, h = s * 1.15;
     c.fillStyle = "#ffffff"; c.strokeStyle = col;
@@ -420,17 +544,59 @@ function drawSym(c, o, scale) {
     c.save();
     c.font = "bold " + fs + "px system-ui, sans-serif";
     c.textAlign = "center"; c.textBaseline = "top";
-    const ly = y + (d.h / 2) * scale + 2 * scale;
+    let ly = y + (d.h / 2) * scale + 2 * scale;
+    if (t.glyph === "dba") ly = y + o.size * 1.5 * scale;
     c.lineWidth = fs * 0.25; c.strokeStyle = "#ffffff";
     c.strokeText(label, x, ly);
     c.fillStyle = "#111111";
     c.fillText(label, x, ly);
     c.restore();
   }
+
+  // dBA value lines (always shown)
+  if (t.glyph === "dba") {
+    const fs = Math.max(8 * scale, o.size * scale * 0.34);
+    c.save();
+    c.font = "bold " + fs + "px system-ui, sans-serif";
+    c.textAlign = "center"; c.textBaseline = "top";
+    let ly = y + (o.size * 0.55) * scale;
+    ["A=" + (o.va || ""), "E=" + (o.ve || "")].forEach(line => {
+      c.lineWidth = fs * 0.25; c.strokeStyle = "#ffffff";
+      c.strokeText(line, x, ly);
+      c.fillStyle = "#111111";
+      c.fillText(line, x, ly);
+      ly += fs * 1.15;
+    });
+    c.restore();
+  }
+
+  // failed cross badge
+  if (o.failed) {
+    const d = symDims(o);
+    const bx = x + (d.w / 2) * scale, by = y - (d.h / 2) * scale;
+    const br = Math.max(5 * scale, o.size * scale * 0.2);
+    c.save();
+    c.strokeStyle = "#ff1744"; c.lineWidth = br * 0.42; c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(bx - br, by - br); c.lineTo(bx + br, by + br);
+    c.moveTo(bx + br, by - br); c.lineTo(bx - br, by + br);
+    c.stroke();
+    c.restore();
+  }
 }
 
 /* ================= Object drawing ================= */
 function drawObject(c, o, scale) {
+  if (o.half) {
+    c.save(); c.globalAlpha = 0.35;
+    drawObjectInner(c, o, scale);
+    c.restore();
+    return;
+  }
+  drawObjectInner(c, o, scale);
+}
+
+function drawObjectInner(c, o, scale) {
   if (o.kind === "sym") { drawSym(c, o, scale); return; }
 
   if (o.kind === "ink") {
@@ -450,8 +616,16 @@ function drawObject(c, o, scale) {
 
   if (o.kind === "text") {
     c.save();
-    c.fillStyle = o.color;
     c.font = "bold " + (o.size * scale) + "px system-ui, sans-serif";
+    if (o.bg) {
+      const tw = c.measureText(o.text).width;
+      const pad = o.size * scale * 0.2;
+      c.fillStyle = "#ffffff";
+      c.fillRect(o.x * scale - pad, o.y * scale - pad, tw + pad * 2, o.size * scale * 1.15 + pad * 2);
+      c.strokeStyle = o.color; c.lineWidth = Math.max(1, o.size * scale * 0.04);
+      c.strokeRect(o.x * scale - pad, o.y * scale - pad, tw + pad * 2, o.size * scale * 1.15 + pad * 2);
+    }
+    c.fillStyle = o.color;
     c.textAlign = "left"; c.textBaseline = "top";
     c.fillText(o.text, o.x * scale, o.y * scale);
     c.restore();
@@ -467,15 +641,51 @@ function drawObject(c, o, scale) {
     if (o.shape === "line" || o.shape === "arrow") {
       c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
       if (o.shape === "arrow") {
-        const ang = Math.atan2(y2 - y1, x2 - x1);
+        const ang = Math.atan2(y1 - y2, x1 - x2);
         const ah = Math.max(10 * scale, o.width * scale * 4);
         c.beginPath();
-        c.moveTo(x2, y2);
-        c.lineTo(x2 - ah * Math.cos(ang - 0.45), y2 - ah * Math.sin(ang - 0.45));
-        c.moveTo(x2, y2);
-        c.lineTo(x2 - ah * Math.cos(ang + 0.45), y2 - ah * Math.sin(ang + 0.45));
+        c.moveTo(x1, y1);
+        c.lineTo(x1 - ah * Math.cos(ang - 0.45), y1 - ah * Math.sin(ang - 0.45));
+        c.moveTo(x1, y1);
+        c.lineTo(x1 - ah * Math.cos(ang + 0.45), y1 - ah * Math.sin(ang + 0.45));
         c.stroke();
       }
+    } else if (o.shape === "hatch") {
+      const hx = Math.min(x1, x2), hy = Math.min(y1, y2);
+      const hw = Math.abs(x2 - x1), hh = Math.abs(y2 - y1);
+      c.save();
+      c.globalAlpha = o.alpha != null ? o.alpha : 0.4;
+      c.beginPath(); c.rect(hx, hy, hw, hh); c.clip();
+      const sp = Math.max(6 * scale, o.width * scale * 5);
+      if (o.pattern === "solid") {
+        c.fillStyle = o.color;
+        c.fillRect(hx, hy, hw, hh);
+      } else if (o.pattern === "dots") {
+        c.fillStyle = o.color;
+        for (let yy = hy + sp / 2; yy < hy + hh; yy += sp)
+          for (let xx = hx + sp / 2; xx < hx + hw; xx += sp) {
+            c.beginPath(); c.arc(xx, yy, Math.max(1, o.width * scale * 0.8), 0, Math.PI * 2); c.fill();
+          }
+      } else {
+        c.lineWidth = Math.max(1, o.width * scale * 0.6);
+        c.beginPath();
+        for (let d = -hh; d < hw; d += sp) {
+          c.moveTo(hx + d, hy + hh); c.lineTo(hx + d + hh, hy);
+        }
+        if (o.pattern === "cross") {
+          for (let d = 0; d < hw + hh; d += sp) {
+            c.moveTo(hx + d - hh, hy); c.lineTo(hx + d, hy + hh);
+          }
+        }
+        c.stroke();
+      }
+      c.restore();
+      c.save();
+      c.globalAlpha = Math.min(1, (o.alpha != null ? o.alpha : 0.4) + 0.25);
+      c.strokeStyle = o.color;
+      c.lineWidth = Math.max(1, o.width * scale * 0.5);
+      c.strokeRect(hx, hy, hw, hh);
+      c.restore();
     } else if (o.shape === "rect") {
       c.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
     } else if (o.shape === "ellipse") {
@@ -573,6 +783,12 @@ function objectBounds(o) {
   return { x1:0, y1:0, x2:0, y2:0 };
 }
 
+function calloutTextRect(o) {
+  const tw = o.text.length * o.size * 0.55;
+  const pad = o.size * 0.35;
+  return { x1:o.x2 - pad, y1:o.y2 - o.size / 2 - pad, x2:o.x2 + tw + pad, y2:o.y2 + o.size / 2 + pad };
+}
+
 function distToSeg(p, a, b) {
   const dx = b.x - a.x, dy = b.y - a.y;
   const len2 = dx * dx + dy * dy;
@@ -593,6 +809,10 @@ function hitObject(px, py) {
       }
     } else if (o.kind === "shape" && (o.shape === "line" || o.shape === "arrow")) {
       if (distToSeg(p, { x:o.x1, y:o.y1 }, { x:o.x2, y:o.y2 }) <= o.width / 2 + slack) return o;
+    } else if (o.kind === "callout") {
+      if (distToSeg(p, { x:o.x1, y:o.y1 }, { x:o.x2, y:o.y2 }) <= o.width / 2 + slack) return o;
+      const b = calloutTextRect(o);
+      if (p.x >= b.x1 - slack && p.x <= b.x2 + slack && p.y >= b.y1 - slack && p.y <= b.y2 + slack) return o;
     } else {
       const b = objectBounds(o);
       if (p.x >= b.x1 - slack && p.x <= b.x2 + slack && p.y >= b.y1 - slack && p.y <= b.y2 + slack) return o;
@@ -621,11 +841,22 @@ function draw() {
   objects.forEach(o => drawObject(ctx, o, view.scale));
   if (tempShape) drawObject(ctx, tempShape, view.scale);
   selection.forEach(o => {
-    const b = objectBounds(o);
-    const pad = 5;
     ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
-    ctx.strokeRect(b.x1 * view.scale - pad, b.y1 * view.scale - pad,
-                   (b.x2 - b.x1) * view.scale + pad * 2, (b.y2 - b.y1) * view.scale + pad * 2);
+    if (o.kind === "callout") {
+      const b = calloutTextRect(o);
+      const pad = 3;
+      ctx.strokeRect(b.x1 * view.scale - pad, b.y1 * view.scale - pad,
+                     (b.x2 - b.x1) * view.scale + pad * 2, (b.y2 - b.y1) * view.scale + pad * 2);
+      ctx.beginPath();
+      ctx.moveTo(o.x1 * view.scale, o.y1 * view.scale);
+      ctx.lineTo(o.x2 * view.scale, o.y2 * view.scale);
+      ctx.stroke();
+    } else {
+      const b = objectBounds(o);
+      const pad = 5;
+      ctx.strokeRect(b.x1 * view.scale - pad, b.y1 * view.scale - pad,
+                     (b.x2 - b.x1) * view.scale + pad * 2, (b.y2 - b.y1) * view.scale + pad * 2);
+    }
     ctx.setLineDash([]);
   });
   ctx.restore();
@@ -696,11 +927,14 @@ function updateSelButtons() {
   btnRotate.disabled = !any;
   btnFlipH.disabled = !any;
   btnFlipV.disabled = !any;
-  btnDetails.disabled = !(selection.length === 1 && selection[0].kind === "sym");
+  btnDetails.disabled = !(selection.some(o => o.kind === "sym") ||
+    (selection.length === 1 && (selection[0].kind === "text" || selection[0].kind === "callout")));
+  document.getElementById("btnHalf").disabled = !any;
+  document.getElementById("btnSame").disabled = !(selection.length >= 1 && selection.every(o => o.kind === "sym" && o.type === selection[0].type));
   if (selection.length === 1) {
     const o = selection[0];
-    if (o.kind === "sym" || o.kind === "text" || o.kind === "callout") sizeSlider.value = o.size;
-    else if (o.kind === "ink" || o.kind === "shape") sizeSlider.value = Math.min(120, Math.max(12, o.width * 8));
+    if (o.kind === "sym" || o.kind === "text" || o.kind === "callout") sizeSlider.value = sliderFromSize(o.size);
+    else if (o.kind === "ink" || o.kind === "shape") sizeSlider.value = sliderFromSize(o.width * 8);
   }
 }
 
@@ -759,10 +993,23 @@ function flipObj(o, axis) {
 btnRotate.onclick = () => { if (!selection.length) return; pushUndo(); selection.forEach(rotObj); draw(); };
 btnFlipH.onclick = () => { if (!selection.length) return; pushUndo(); selection.forEach(o => flipObj(o, "h")); draw(); };
 btnFlipV.onclick = () => { if (!selection.length) return; pushUndo(); selection.forEach(o => flipObj(o, "v")); draw(); };
+document.getElementById("btnHalf").onclick = () => {
+  if (!selection.length) return;
+  pushUndo();
+  const on = !selection.every(o => o.half);
+  selection.forEach(o => { o.half = on; });
+  draw();
+};
+document.getElementById("btnSame").onclick = () => {
+  if (!selection.length || selection[0].kind !== "sym") return;
+  const ty = selection[0].type;
+  setSelection(objects.filter(o => o.kind === "sym" && o.type === ty));
+  draw();
+};
 
 sizeSlider.addEventListener("input", () => {
   if (!selection.length) return;
-  const v = +sizeSlider.value;
+  const v = sizeVal();
   selection.forEach(o => {
     if (o.kind === "ink" || o.kind === "shape") o.width = v / 8;
     else if (o.kind === "sym" || o.kind === "text" || o.kind === "callout") o.size = v;
@@ -1055,7 +1302,7 @@ function deliverFile(blob, name, mime) {
 }
 
 function projectBlob() {
-  const proj = { app:"block-plan-marker", version:3, image:imgDataUrl, objects:objects, labelsOn:labelsOn };
+  const proj = { app:"block-plan-marker", version:4, image:imgDataUrl, objects:objects, labelsOn:labelsOn, siteNotes:siteNotes };
   return new Blob([JSON.stringify(proj)], { type:"application/json" });
 }
 
@@ -1101,6 +1348,7 @@ function loadProjectFile(file) {
       im.onload = () => {
         objects = migrate(proj.objects);
         if (typeof proj.labelsOn === "boolean") { labelsOn = proj.labelsOn; refreshLabelsBtn(); }
+        siteNotes = proj.siteNotes || "";
         undoStack = []; redoStack = [];
         fileHandle = null;
         setImage(im, proj.image, true);
@@ -1151,7 +1399,7 @@ async function autosaveNow() {
   if (!img || !autosaveDirty) return;
   autosaveDirty = false;
   try {
-    await idbPut("autosave", { image:imgDataUrl, objects:objects, labelsOn:labelsOn, t:Date.now() });
+    await idbPut("autosave", { image:imgDataUrl, objects:objects, labelsOn:labelsOn, siteNotes:siteNotes, t:Date.now() });
     noteSaved("Autosaved");
   } catch (e) { /* storage full or unavailable — ignore */ }
 }
@@ -1166,6 +1414,7 @@ async function tryRestoreAutosave() {
     im.onload = () => {
       objects = migrate(a.objects);
       if (typeof a.labelsOn === "boolean") { labelsOn = a.labelsOn; refreshLabelsBtn(); }
+      siteNotes = a.siteNotes || "";
       setImage(im, a.image, true);
       lastSaveNote = "Restored autosave from " + new Date(a.t).toTimeString().slice(0, 5); updateStatus();
     };
@@ -1194,7 +1443,8 @@ function localXY(e) {
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 
-const SHAPE_TOOLS = ["line", "arrow", "rect", "ellipse", "cloud", "callout"];
+const SHAPE_TOOLS = ["line", "arrow", "rect", "ellipse", "cloud", "callout", "hatchd", "hatchx", "hatchs", "hatcho"];
+const HATCH_PATTERN = { hatchd:"diag", hatchx:"cross", hatchs:"solid", hatcho:"dots" };
 
 cv.addEventListener("pointerdown", e => {
   if (!img) return;
@@ -1242,7 +1492,7 @@ cv.addEventListener("pointerdown", e => {
     pushUndo();
     currentStroke = {
       kind:"ink", points:[ip], color:penColor,
-      width: activeTool === "hl" ? Math.max(6, (+sizeSlider.value) / 3) : Math.max(1.5, (+sizeSlider.value) / 8),
+      width: activeTool === "hl" ? Math.max(6, sizeVal() / 3) : Math.max(1.5, sizeVal() / 8),
       alpha: activeTool === "hl" ? 0.35 : 1
     };
     objects.push(currentStroke);
@@ -1252,8 +1502,18 @@ cv.addEventListener("pointerdown", e => {
   }
 
   if (activeTool === "text") {
-    dragMode = "textTap";
-    panStart = { x:p.x, y:p.y, viewX:view.x, viewY:view.y };
+    const hitT = hitObject(p.x, p.y);
+    if (hitT) {
+      setSelection([hitT]);
+      pushUndo();
+      dragMode = "moveSel";
+      moveStartImg = ip;
+      moveOrig = selection.map(o => JSON.stringify(o));
+      draw();
+    } else {
+      dragMode = "textTap";
+      panStart = { x:p.x, y:p.y, viewX:view.x, viewY:view.y };
+    }
     return;
   }
 
@@ -1329,10 +1589,12 @@ cv.addEventListener("pointermove", e => {
   if (dragMode === "shape" && shapeStart) {
     const base = {
       color: penColor,
-      width: Math.max(1.5, (+sizeSlider.value) / 8)
+      width: Math.max(1.5, sizeVal() / 8)
     };
     if (activeTool === "callout") {
-      tempShape = { kind:"callout", x1:shapeStart.x, y1:shapeStart.y, x2:ip.x, y2:ip.y, text:"…", size:+sizeSlider.value, color:penColor, width:base.width };
+      tempShape = { kind:"callout", x1:shapeStart.x, y1:shapeStart.y, x2:ip.x, y2:ip.y, text:"…", size:sizeVal(), color:penColor, width:base.width };
+    } else if (HATCH_PATTERN[activeTool]) {
+      tempShape = { kind:"shape", shape:"hatch", pattern:HATCH_PATTERN[activeTool], x1:shapeStart.x, y1:shapeStart.y, x2:ip.x, y2:ip.y, color:penColor, width:base.width, alpha:0.4 };
     } else {
       tempShape = { kind:"shape", shape:activeTool, x1:shapeStart.x, y1:shapeStart.y, x2:ip.x, y2:ip.y, color:penColor, width:base.width };
     }
@@ -1435,9 +1697,10 @@ function endPointer(e) {
       if (undoStack.length) undoStack.pop();
       // double-tap on a single selected device opens details
       const now = Date.now();
-      if (selection.length === 1 && selection[0].kind === "sym" &&
+      if (selection.length === 1 &&
           now - lastTap.t < 380 && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < 34) {
-        openDetails();
+        if (selection[0].kind === "sym") openDetails();
+        else if (selection[0].kind === "text" || selection[0].kind === "callout") openTextEditor(selection[0]);
       }
       lastTap = { t: now, x: p.x, y: p.y };
     } else { scheduleAutosave(); }
@@ -1449,7 +1712,7 @@ function endPointer(e) {
   if (dragMode === "placeOrPan") {
     if (!moved && TYPE_MAP[activeTool]) {
       pushUndo();
-      const m = { kind:"sym", type:activeTool, x:ip.x, y:ip.y, size:+sizeSlider.value, rot:0, fx:false, fy:false, zone:"", loop:"", dev:"", info:"" };
+      const m = { kind:"sym", type:activeTool, x:ip.x, y:ip.y, size:sizeVal(), rot:0, fx:false, fy:false, zone:"", loop:"", dev:"", info:"" };
       objects.push(m);
       setSelection([m]);
       draw();
@@ -1463,7 +1726,7 @@ function endPointer(e) {
       const content = window.prompt("Text:");
       if (content && content.trim()) {
         pushUndo();
-        const t = { kind:"text", x:ip.x, y:ip.y, text:content.trim(), size:+sizeSlider.value, color:penColor };
+        const t = { kind:"text", x:ip.x, y:ip.y, text:content.trim(), size:sizeVal(), color:penColor };
         objects.push(t);
         setSelection([t]);
       }
@@ -1487,37 +1750,254 @@ cv.addEventListener("wheel", e => {
 cv.addEventListener("contextmenu", e => e.preventDefault());
 
 cv.addEventListener("dblclick", () => {
-  if (selection.length === 1 && selection[0].kind === "sym") openDetails();
+  if (selection.length !== 1) return;
+  if (selection[0].kind === "sym") openDetails();
+  else if (selection[0].kind === "text" || selection[0].kind === "callout") openTextEditor(selection[0]);
 });
 
 /* ================= Details popup ================= */
 const detailsModal = document.getElementById("detailsModal");
-let detailsTarget = null;
+let detailsTargets = [];
+let detailsPhoto = undefined;   // undefined = unchanged, null = removed, string = new dataURL
+let failedTouched = false;
 
 function openDetails() {
-  if (!(selection.length === 1 && selection[0].kind === "sym")) return;
-  detailsTarget = selection[0];
-  const t = TYPE_MAP[detailsTarget.type];
-  document.getElementById("detailsTitle").textContent = (t ? t.label : "Device") + " details";
-  document.getElementById("dZone").value = detailsTarget.zone || "";
-  document.getElementById("dLoop").value = detailsTarget.loop || "";
-  document.getElementById("dDev").value = detailsTarget.dev || "";
-  document.getElementById("dInfo").value = detailsTarget.info || "";
+  const syms = selection.filter(o => o.kind === "sym");
+  // single text/callout: open the text editor instead
+  if (!syms.length && selection.length === 1 && (selection[0].kind === "text" || selection[0].kind === "callout")) {
+    openTextEditor(selection[0]);
+    return;
+  }
+  if (!syms.length) return;
+  detailsTargets = syms;
+  detailsPhoto = undefined;
+  failedTouched = false;
+  const multi = syms.length > 1;
+  const t = TYPE_MAP[syms[0].type];
+  document.getElementById("detailsTitle").textContent = multi
+    ? syms.length + " devices — filled fields apply to all"
+    : (t ? t.label : "Device") + " details";
+  ["dZone", "dLoop", "dDev", "dInfo", "dVa", "dVe"].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = multi ? "" : (syms[0][{ dZone:"zone", dLoop:"loop", dDev:"dev", dInfo:"info", dVa:"va", dVe:"ve" }[id]] || "");
+    el.placeholder = multi ? "(leave blank to keep)" : "";
+  });
+  document.getElementById("dbaFields").style.display = syms.some(o => o.type === "dba") ? "block" : "none";
+  const fEl = document.getElementById("dFailed");
+  fEl.checked = syms.every(o => o.failed);
+  fEl.indeterminate = multi && syms.some(o => o.failed) && !syms.every(o => o.failed);
+  fEl.onchange = () => { failedTouched = true; };
+  const ph = document.getElementById("dPhotoPreview");
+  const photo = !multi && syms[0].photo;
+  ph.src = photo || "";
+  ph.style.display = photo ? "block" : "none";
+  document.getElementById("dPhotoRemove").style.display = photo ? "inline-block" : "none";
+  document.getElementById("photoWrap").style.display = multi ? "none" : "block";
   detailsModal.classList.add("show");
 }
 document.getElementById("btnDetails").onclick = openDetails;
-document.getElementById("detailsCancel").onclick = () => { detailsModal.classList.remove("show"); detailsTarget = null; };
+document.getElementById("detailsCancel").onclick = () => { detailsModal.classList.remove("show"); detailsTargets = []; };
+
+document.getElementById("dPhotoAdd").onclick = () => document.getElementById("dPhotoInput").click();
+document.getElementById("dPhotoInput").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      const mx = 320;
+      const sc = Math.min(1, mx / Math.max(im.naturalWidth, im.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(im.naturalWidth * sc); c.height = Math.round(im.naturalHeight * sc);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      detailsPhoto = c.toDataURL("image/jpeg", 0.8);
+      const ph = document.getElementById("dPhotoPreview");
+      ph.src = detailsPhoto; ph.style.display = "block";
+      document.getElementById("dPhotoRemove").style.display = "inline-block";
+    };
+    im.src = reader.result;
+  };
+  reader.readAsDataURL(f);
+});
+document.getElementById("dPhotoRemove").onclick = () => {
+  detailsPhoto = null;
+  const ph = document.getElementById("dPhotoPreview");
+  ph.style.display = "none";
+  document.getElementById("dPhotoRemove").style.display = "none";
+};
+
 document.getElementById("detailsSave").onclick = () => {
-  if (detailsTarget) {
+  if (detailsTargets.length) {
     pushUndo();
-    detailsTarget.zone = document.getElementById("dZone").value.trim();
-    detailsTarget.loop = document.getElementById("dLoop").value.trim();
-    detailsTarget.dev = document.getElementById("dDev").value.trim();
-    detailsTarget.info = document.getElementById("dInfo").value.trim();
+    const multi = detailsTargets.length > 1;
+    const vals = {
+      zone: document.getElementById("dZone").value.trim(),
+      loop: document.getElementById("dLoop").value.trim(),
+      dev:  document.getElementById("dDev").value.trim(),
+      info: document.getElementById("dInfo").value.trim(),
+      va:   document.getElementById("dVa").value.trim(),
+      ve:   document.getElementById("dVe").value.trim()
+    };
+    const failed = document.getElementById("dFailed").checked;
+    detailsTargets.forEach(o => {
+      Object.entries(vals).forEach(([k, v]) => {
+        if (!multi || v !== "") o[k] = v;
+      });
+      if (!multi || failedTouched) o.failed = failed;
+      if (!multi && detailsPhoto !== undefined) {
+        if (detailsPhoto === null) delete o.photo; else o.photo = detailsPhoto;
+      }
+    });
   }
   detailsModal.classList.remove("show");
-  detailsTarget = null;
+  detailsTargets = [];
   draw();
+};
+
+/* ---- text editor ---- */
+const textModal = document.getElementById("textModal");
+let textTarget = null;
+function openTextEditor(o) {
+  textTarget = o;
+  document.getElementById("tText").value = o.text || "";
+  document.getElementById("tBg").checked = !!o.bg;
+  document.getElementById("tBg").parentElement.style.display = o.kind === "text" ? "flex" : "none";
+  textModal.classList.add("show");
+}
+document.getElementById("textCancel").onclick = () => { textModal.classList.remove("show"); textTarget = null; };
+document.getElementById("textSave").onclick = () => {
+  if (textTarget) {
+    const v = document.getElementById("tText").value.trim();
+    if (v) {
+      pushUndo();
+      textTarget.text = v;
+      if (textTarget.kind === "text") textTarget.bg = document.getElementById("tBg").checked;
+    }
+  }
+  textModal.classList.remove("show");
+  textTarget = null;
+  draw();
+};
+
+/* ---- site notes ---- */
+document.getElementById("btnNotes").onclick = () => {
+  document.getElementById("notesText").value = siteNotes;
+  document.getElementById("notesModal").classList.add("show");
+};
+document.getElementById("notesCancel").onclick = () => document.getElementById("notesModal").classList.remove("show");
+document.getElementById("notesSave").onclick = () => {
+  siteNotes = document.getElementById("notesText").value;
+  scheduleAutosave();
+  document.getElementById("notesModal").classList.remove("show");
+};
+
+/* ---- page space ---- */
+document.getElementById("btnPageSpace").onclick = () => {
+  if (!img) return;
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth;
+  c.height = Math.round(img.naturalHeight * 1.25);
+  const cx = c.getContext("2d");
+  cx.fillStyle = "#ffffff";
+  cx.fillRect(0, 0, c.width, c.height);
+  cx.drawImage(img, 0, 0);
+  const dataUrl = c.toDataURL("image/jpeg", 0.92);
+  const im = new Image();
+  im.onload = () => setImage(im, dataUrl, true);
+  im.src = dataUrl;
+};
+
+/* ---- site report ---- */
+function reportData() {
+  const zones = zoneCounts();
+  const zoneKeys = Object.keys(zones).sort((a, b) => a.localeCompare(b, undefined, { numeric:true }));
+  const totals = {};
+  let grand = 0;
+  objects.forEach(o => {
+    if (o.kind !== "sym") return;
+    totals[o.type] = (totals[o.type] || 0) + 1;
+    grand++;
+  });
+  const failed = objects.filter(o => o.kind === "sym" && o.failed);
+  return { zones, zoneKeys, totals, grand, failed };
+}
+
+function symRef(o) {
+  const parts = [];
+  if (o.zone) parts.push("Z" + o.zone);
+  if (o.loop) parts.push("L" + o.loop);
+  if (o.dev)  parts.push("D" + o.dev);
+  return parts.join("·");
+}
+
+function reportLines() {
+  const d = reportData();
+  const lines = [];
+  lines.push(["h", "Site report — " + new Date().toLocaleDateString()]);
+  lines.push(["h2", "Devices by zone"]);
+  d.zoneKeys.forEach(z => {
+    const parts = Object.entries(d.zones[z]).map(([ty, n]) => (TYPE_MAP[ty] ? TYPE_MAP[ty].label : ty) + " × " + n);
+    const total = Object.values(d.zones[z]).reduce((a, b) => a + b, 0);
+    lines.push(["b", "Zone " + z + " (" + total + ")"]);
+    lines.push(["t", parts.join(", ")]);
+  });
+  lines.push(["h2", "Totals"]);
+  Object.entries(d.totals).forEach(([ty, n]) => lines.push(["t", (TYPE_MAP[ty] ? TYPE_MAP[ty].label : ty) + " × " + n]));
+  lines.push(["b", "All devices: " + d.grand]);
+  lines.push(["h2", "Failed items (" + d.failed.length + ")"]);
+  if (!d.failed.length) lines.push(["t", "None recorded"]);
+  d.failed.forEach(o => {
+    const t = TYPE_MAP[o.type];
+    lines.push(["t", "✗ " + (t ? t.label : o.type) + (symRef(o) ? " — " + symRef(o) : "") + (o.info ? " — " + o.info : "")]);
+  });
+  if (siteNotes.trim()) {
+    lines.push(["h2", "Site notes"]);
+    siteNotes.split("\n").forEach(l => lines.push(["t", l]));
+  }
+  return lines;
+}
+
+document.getElementById("btnReport").onclick = () => {
+  const lines = reportLines();
+  let html = "";
+  lines.forEach(([k, txt]) => {
+    const esc = txt.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    if (k === "h") html += '<div style="font-size:16px;font-weight:700;color:#ff8a70;margin:4px 0 8px">' + esc + "</div>";
+    else if (k === "h2") html += '<div style="font-size:14px;font-weight:700;margin:12px 0 4px">' + esc + "</div>";
+    else if (k === "b") html += '<div style="font-weight:700;margin:6px 0 1px">' + esc + "</div>";
+    else html += '<div style="color:#ccc;margin:1px 0">' + esc + "</div>";
+  });
+  document.getElementById("reportBody").innerHTML = html;
+  document.getElementById("reportModal").classList.add("show");
+};
+document.getElementById("reportClose").onclick = () => document.getElementById("reportModal").classList.remove("show");
+
+document.getElementById("reportPdf").onclick = () => {
+  const lines = reportLines();
+  const W = 1240, margin = 90, lineGap = 10;
+  const sizes = { h: 44, h2: 32, b: 26, t: 24 };
+  let y = margin;
+  lines.forEach(([k]) => { y += sizes[k] + lineGap + (k === "h2" ? 18 : 0); });
+  const H = Math.max(y + margin, 600);
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const cx = c.getContext("2d");
+  cx.fillStyle = "#ffffff"; cx.fillRect(0, 0, W, H);
+  y = margin;
+  lines.forEach(([k, txt]) => {
+    if (k === "h2") y += 18;
+    cx.fillStyle = k === "t" ? "#333333" : "#000000";
+    cx.font = (k === "t" ? "" : "bold ") + sizes[k] + "px system-ui, sans-serif";
+    cx.textBaseline = "top";
+    cx.fillText(txt, margin, y);
+    if (k === "h") {
+      cx.fillRect(margin, y + sizes[k] + 6, W - margin * 2, 3);
+    }
+    y += sizes[k] + lineGap;
+  });
+  deliverFile(canvasToPdfBlob(c), "site-report-" + new Date().toISOString().slice(0, 10) + ".pdf", "application/pdf");
 };
 
 /* ================= Zones panel ================= */
