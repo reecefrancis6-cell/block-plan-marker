@@ -83,7 +83,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v12</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.12 beta</span></span>
     <button class="btn" id="btnOpenProj">&#128194; Open</button>
     <button class="btn" id="btnPhoto">&#128247; Photo</button>
     <button class="btn" id="btnSaveProj">&#128190; Save</button>
@@ -123,6 +123,7 @@
   <div id="bottombar">
     <div id="sizeWrap">Size <input type="range" id="sizeSlider" min="0" max="100" value="48"></div>
     <div id="swatches"></div>
+    <div id="alphaWrap" style="display:none;align-items:center;gap:5px;font-size:12px;color:#aaa">Opacity <input type="range" id="alphaSlider" min="10" max="100" value="40" style="width:80px"></div>
     <button class="btn" id="btnDetails" disabled>&#9432; Details</button>
     <button class="btn" id="btnRotate" disabled title="Rotate 90&deg;">&#10227;</button>
     <button class="btn" id="btnFlipH" disabled title="Flip horizontal">&#8644;</button>
@@ -133,6 +134,7 @@
     <button class="btn" id="btnUngroup" disabled>Ungroup</button>
     <button class="btn" id="btnDup" disabled>Duplicate</button>
     <button class="btn" id="btnDel" disabled>Delete</button>
+    <button class="btn" id="btnFlatten" disabled title="Permanently burn selection into the plan">Flatten</button>
     <span class="spacer"></span>
     <span id="status">No plan loaded</span>
   </div>
@@ -179,8 +181,15 @@
 
 <div class="modal" id="textModal">
   <div class="modalbox">
-    <h3>Edit text</h3>
-    <label>Text</label><input type="text" id="tText" autocomplete="off">
+    <h3 id="textModalTitle">Text</h3>
+    <label>Text (Enter = new line)</label>
+    <textarea id="tText" rows="3" style="width:100%;background:#1a1d21;border:1px solid #444;border-radius:6px;color:#e8e8e8;padding:8px;font-size:14px;font-family:inherit"></textarea>
+    <div id="tFmtRow" style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn" id="tBold" style="font-weight:800">B</button>
+      <button class="btn" id="tItalic" style="font-style:italic">I</button>
+      <button class="btn" id="tUnder" style="text-decoration:underline">U</button>
+      <button class="btn" id="tStrike" style="text-decoration:line-through">S</button>
+    </div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:#e8e8e8">
       <input type="checkbox" id="tBg" style="width:18px;height:18px"> White background box
     </label>
@@ -464,31 +473,27 @@ function drawSym(c, o, scale) {
     c.lineTo(-w / 2 + sq, sq / 2 - sq * 0.1);
     c.closePath(); c.fill(); c.stroke();
   } else if (t.glyph === "sm240") {
-    // 240V smoke alarm: disc with concentric vent rings + "!" badge
     const r = s / 2;
-    c.fillStyle = col; c.strokeStyle = "#333333";
-    c.lineWidth = Math.max(1, r * 0.08);
+    c.fillStyle = col; c.strokeStyle = "#ffffff";
+    c.lineWidth = Math.max(1, r * 0.12);
     c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill(); c.stroke();
-    c.strokeStyle = "#ffffff"; c.lineWidth = Math.max(1.4, r * 0.13); c.lineCap = "round";
-    [0.34, 0.56, 0.78].forEach(f => {
-      c.setLineDash([r * 0.2, r * 0.22]);
-      c.beginPath(); c.arc(-r * 0.08, 0, r * f, 0, Math.PI * 2); c.stroke();
-    });
-    c.setLineDash([]);
-    c.fillStyle = "#ffffff";
-    c.beginPath(); c.arc(-r * 0.08, 0, r * 0.14, 0, Math.PI * 2); c.fill();
-    c.beginPath(); c.arc(r * 0.82, 0, r * 0.09, 0, Math.PI * 2); c.fill();
-    const bx = r * 0.72, by = r * 0.72, br = r * 0.46;
-    c.fillStyle = col;
-    c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill();
-    c.strokeStyle = "#ffffff"; c.lineWidth = Math.max(1, br * 0.18);
-    c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = "#111111"; c.lineWidth = Math.max(1.2, r * 0.11);
+    c.lineJoin = "round";
+    c.beginPath();
+    c.moveTo(r * 0.16, -r * 0.62);
+    c.lineTo(-r * 0.3, r * 0.05);
+    c.lineTo(-r * 0.02, r * 0.05);
+    c.lineTo(-r * 0.16, r * 0.45);
+    c.lineTo(r * 0.3, -r * 0.2);
+    c.lineTo(r * 0.02, -r * 0.2);
+    c.closePath();
+    c.stroke();
     c.save();
     c.scale(sx, sy);
-    c.fillStyle = "#ffffff";
-    c.font = "bold " + (br * 1.3) + "px system-ui, sans-serif";
+    c.fillStyle = "#111111";
+    c.font = "bold " + (r * 0.42) + "px system-ui, sans-serif";
     c.textAlign = "center"; c.textBaseline = "middle";
-    c.fillText("!", sx * bx, sy * by + br * 0.08);
+    c.fillText("240V", 0, sy * (r * 0.68));
     c.restore();
   } else if (t.glyph === "dba") {
     // speaker with sound waves
@@ -626,7 +631,10 @@ function drawObjectInner(c, o, scale) {
   if (o.kind === "img") {
     const el = getCachedImg(o.src);
     if (el && el.complete && el.naturalWidth) {
+      c.save();
+      if (o.alpha != null && o.alpha < 1) c.globalAlpha = c.globalAlpha * o.alpha;
       c.drawImage(el, o.x * scale, o.y * scale, o.w * scale, o.h * scale);
+      c.restore();
     } else {
       c.save();
       c.fillStyle = "#eeeeee"; c.strokeStyle = "#999999";
@@ -638,19 +646,36 @@ function drawObjectInner(c, o, scale) {
   }
 
   if (o.kind === "text") {
+    const d = textBlockDims(o);
     c.save();
-    c.font = "bold " + (o.size * scale) + "px system-ui, sans-serif";
+    c.font = textFont(o, scale);
     if (o.bg) {
-      const tw = c.measureText(o.text).width;
       const pad = o.size * scale * 0.2;
       c.fillStyle = "#ffffff";
-      c.fillRect(o.x * scale - pad, o.y * scale - pad, tw + pad * 2, o.size * scale * 1.15 + pad * 2);
+      c.fillRect(o.x * scale - pad, o.y * scale - pad, d.w * scale + pad * 2, d.h * scale + pad * 2);
       c.strokeStyle = o.color; c.lineWidth = Math.max(1, o.size * scale * 0.04);
-      c.strokeRect(o.x * scale - pad, o.y * scale - pad, tw + pad * 2, o.size * scale * 1.15 + pad * 2);
+      c.strokeRect(o.x * scale - pad, o.y * scale - pad, d.w * scale + pad * 2, d.h * scale + pad * 2);
     }
     c.fillStyle = o.color;
     c.textAlign = "left"; c.textBaseline = "top";
-    c.fillText(o.text, o.x * scale, o.y * scale);
+    mctx.font = textFont(o, 1);
+    d.lines.forEach((ln, i) => {
+      const ly = (o.y + i * o.size * 1.15) * scale;
+      c.fillText(ln, o.x * scale, ly);
+      const lw = mctx.measureText(ln).width * scale;
+      if (o.under || o.strike) {
+        c.strokeStyle = o.color;
+        c.lineWidth = Math.max(1, o.size * scale * 0.06);
+        if (o.under) {
+          c.beginPath(); c.moveTo(o.x * scale, ly + o.size * scale * 1.04);
+          c.lineTo(o.x * scale + lw, ly + o.size * scale * 1.04); c.stroke();
+        }
+        if (o.strike) {
+          c.beginPath(); c.moveTo(o.x * scale, ly + o.size * scale * 0.52);
+          c.lineTo(o.x * scale + lw, ly + o.size * scale * 0.52); c.stroke();
+        }
+      }
+    });
     c.restore();
     return;
   }
@@ -804,8 +829,8 @@ function objectBounds(o) {
     return { x1, y1, x2, y2 };
   }
   if (o.kind === "text") {
-    const w = o.text.length * o.size * 0.55;
-    return { x1:o.x, y1:o.y, x2:o.x + w, y2:o.y + o.size * 1.15 };
+    const d = textBlockDims(o);
+    return { x1:o.x, y1:o.y, x2:o.x + d.w, y2:o.y + d.h };
   }
   if (o.kind === "img") {
     return { x1:o.x, y1:o.y, x2:o.x + o.w, y2:o.y + o.h };
@@ -824,6 +849,36 @@ function objectBounds(o) {
              x2:Math.max(o.x1, o.x2 + tw + o.size), y2:Math.max(o.y1, o.y2 + o.size) };
   }
   return { x1:0, y1:0, x2:0, y2:0 };
+}
+
+const mctx = document.createElement("canvas").getContext("2d");
+function textFont(o, scale) {
+  return (o.italic ? "italic " : "") + (o.bold !== false ? "bold " : "") + (o.size * (scale || 1)) + "px system-ui, sans-serif";
+}
+function textLines(o) {
+  mctx.font = textFont(o, 1);
+  const paras = String(o.text).split("\n");
+  if (!o.w) return paras;
+  const lines = [];
+  paras.forEach(p => {
+    const words = p.split(" ");
+    let cur = "";
+    words.forEach(wd => {
+      const t = cur ? cur + " " + wd : wd;
+      if (mctx.measureText(t).width > o.w && cur) { lines.push(cur); cur = wd; }
+      else cur = t;
+    });
+    lines.push(cur);
+  });
+  return lines;
+}
+function textBlockDims(o) {
+  mctx.font = textFont(o, 1);
+  const lines = textLines(o);
+  let w = 0;
+  lines.forEach(l => { w = Math.max(w, mctx.measureText(l).width); });
+  if (o.w) w = Math.max(w, o.w);
+  return { w:w, h:lines.length * o.size * 1.15, lines:lines };
 }
 
 const imgCache = new Map();
@@ -894,8 +949,8 @@ function getHandles(o) {
     }});
   } else if (o.kind === "text") {
     const b = objectBounds(o);
-    H.push({ x:b.x2, y:b.y2, set:(nx, ny) => {
-      o.size = Math.max(8, Math.min(400, (ny - o.y) / 1.15));
+    H.push({ x:b.x2, y:(b.y1 + b.y2) / 2, set:(nx, ny) => {
+      o.w = Math.max(o.size * 2, nx - o.x);
     }});
   } else if (o.kind === "img") {
     const corners = [
@@ -1063,6 +1118,14 @@ function updateSelButtons() {
   document.getElementById("btnSame").disabled = !(selection.length >= 1 && selection.every(o => o.kind === "sym" && o.type === selection[0].type));
   document.getElementById("btnGroup").disabled = selection.length < 2;
   document.getElementById("btnUngroup").disabled = !selection.some(o => o.grp);
+  document.getElementById("btnFlatten").disabled = !any;
+  const alphaTargets = selection.filter(o => (o.kind === "shape" && o.shape === "hatch") || o.kind === "img");
+  const aw = document.getElementById("alphaWrap");
+  aw.style.display = alphaTargets.length ? "flex" : "none";
+  if (alphaTargets.length) {
+    const a0 = alphaTargets[0].alpha != null ? alphaTargets[0].alpha : (alphaTargets[0].kind === "img" ? 1 : 0.4);
+    document.getElementById("alphaSlider").value = Math.round(a0 * 100);
+  }
   if (selection.length === 1) {
     const o = selection[0];
     if (o.kind === "sym" || o.kind === "text" || o.kind === "callout") sizeSlider.value = sliderFromSize(o.size);
@@ -1096,9 +1159,30 @@ btnDel.onclick = () => {
 };
 
 /* ---- rotate / flip ---- */
+function rasterTransform(o, mode) {
+  const el = getCachedImg(o.src);
+  if (!el || !el.complete || !el.naturalWidth) return;
+  const c = document.createElement("canvas");
+  const cx = c.getContext("2d");
+  if (mode === "rot") {
+    c.width = el.naturalHeight; c.height = el.naturalWidth;
+    cx.translate(c.width / 2, c.height / 2);
+    cx.rotate(Math.PI / 2);
+    cx.drawImage(el, -el.naturalWidth / 2, -el.naturalHeight / 2);
+    const ctr = { x:o.x + o.w / 2, y:o.y + o.h / 2 };
+    const nw = o.h, nh = o.w;
+    o.x = ctr.x - nw / 2; o.y = ctr.y - nh / 2; o.w = nw; o.h = nh;
+  } else {
+    c.width = el.naturalWidth; c.height = el.naturalHeight;
+    if (mode === "h") { cx.scale(-1, 1); cx.drawImage(el, -c.width, 0); }
+    else { cx.scale(1, -1); cx.drawImage(el, 0, -c.height); }
+  }
+  o.src = c.toDataURL("image/jpeg", 0.9);
+}
+
 function rotObj(o) {
   if (o.kind === "sym") { o.rot = ((o.rot || 0) + 90) % 360; return; }
-  if (o.kind === "img") return;
+  if (o.kind === "img") { rasterTransform(o, "rot"); return; }
   if (o.pts) {
     const b = objectBounds(o);
     const cx = (b.x1 + b.x2) / 2, cy = (b.y1 + b.y2) / 2;
@@ -1120,7 +1204,7 @@ function flipObj(o, axis) {
     if (axis === "h") o.fx = !o.fx; else o.fy = !o.fy;
     return;
   }
-  if (o.kind === "img") return;
+  if (o.kind === "img") { rasterTransform(o, axis); return; }
   if (o.pts) {
     const b = objectBounds(o);
     const cx = (b.x1 + b.x2) / 2, cy = (b.y1 + b.y2) / 2;
@@ -1140,6 +1224,34 @@ function flipObj(o, axis) {
 btnRotate.onclick = () => { if (!selection.length) return; pushUndo(); selection.forEach(rotObj); draw(); };
 btnFlipH.onclick = () => { if (!selection.length) return; pushUndo(); selection.forEach(o => flipObj(o, "h")); draw(); };
 btnFlipV.onclick = () => { if (!selection.length) return; pushUndo(); selection.forEach(o => flipObj(o, "v")); draw(); };
+document.getElementById("alphaSlider").addEventListener("input", () => {
+  const v = (+document.getElementById("alphaSlider").value) / 100;
+  selection.forEach(o => {
+    if ((o.kind === "shape" && o.shape === "hatch") || o.kind === "img") o.alpha = v;
+  });
+  requestDraw();
+});
+document.getElementById("alphaSlider").addEventListener("change", scheduleAutosave);
+
+document.getElementById("btnFlatten").onclick = () => {
+  if (!selection.length || !img) return;
+  if (!window.confirm("Flatten " + selection.length + " item(s) permanently into the plan? This cannot be undone.")) return;
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const cx = c.getContext("2d");
+  cx.drawImage(img, 0, 0);
+  objects.forEach(o => { if (selection.includes(o)) drawObject(cx, o, 1); });
+  const keep = objects.filter(o => !selection.includes(o));
+  const dataUrl = c.toDataURL("image/jpeg", 0.92);
+  const im = new Image();
+  im.onload = () => {
+    objects = keep;
+    clearSelection();
+    setImage(im, dataUrl, true);
+  };
+  im.src = dataUrl;
+};
+
 document.getElementById("btnHalf").onclick = () => {
   if (!selection.length) return;
   pushUndo();
@@ -1959,14 +2071,7 @@ function endPointer(e) {
   if (dragMode === "shape") {
     if (tempShape && moved) {
       if (activeTool === "callout") {
-        const txt = window.prompt("Callout text:");
-        if (txt && txt.trim()) {
-          pushUndo();
-          tempShape.text = txt.trim();
-          objects.push(tempShape);
-          setSelection([tempShape]);
-          setTool("select");
-        }
+        openTextCreator({ mode:"callout", shape:tempShape });
       } else {
         pushUndo();
         objects.push(tempShape);
@@ -2029,17 +2134,7 @@ function endPointer(e) {
   }
 
   if (dragMode === "textTap") {
-    if (!moved) {
-      const content = window.prompt("Text:");
-      if (content && content.trim()) {
-        pushUndo();
-        const t = { kind:"text", x:ip.x, y:ip.y, text:content.trim(), size:sizeVal(), color:penColor };
-        objects.push(t);
-        setSelection([t]);
-        setTool("select");
-      }
-      draw();
-    }
+    if (!moved) openTextCreator({ mode:"text", x:ip.x, y:ip.y });
     dragMode = null; panStart = null;
     return;
   }
@@ -2164,29 +2259,80 @@ document.getElementById("detailsSave").onclick = () => {
   draw();
 };
 
-/* ---- text editor ---- */
+/* ---- text editor (edit + create) ---- */
 const textModal = document.getElementById("textModal");
 let textTarget = null;
-function openTextEditor(o) {
-  textTarget = o;
-  document.getElementById("tText").value = o.text || "";
-  document.getElementById("tBg").checked = !!o.bg;
-  document.getElementById("tBg").checked = o.kind === "callout" ? o.bg !== false : !!o.bg;
-  document.getElementById("tBg").parentElement.style.display = "flex";
-  textModal.classList.add("show");
+let textCreate = null;   // {mode:"text", x, y} | {mode:"callout", shape}
+const FMT_KEYS = ["bold", "italic", "under", "strike"];
+const fmtBtns = { bold:"tBold", italic:"tItalic", under:"tUnder", strike:"tStrike" };
+let fmtState = { bold:true, italic:false, under:false, strike:false };
+
+FMT_KEYS.forEach(k => {
+  document.getElementById(fmtBtns[k]).onclick = () => {
+    fmtState[k] = !fmtState[k];
+    refreshFmtBtns();
+  };
+});
+function refreshFmtBtns() {
+  FMT_KEYS.forEach(k => document.getElementById(fmtBtns[k]).classList.toggle("toggled", !!fmtState[k]));
 }
-document.getElementById("textCancel").onclick = () => { textModal.classList.remove("show"); textTarget = null; };
+function stickyBg(kind) {
+  try { return localStorage.getItem("bpm-bg-" + kind) === "1"; } catch (e) { return kind === "callout"; }
+}
+function saveStickyBg(kind, val) {
+  try { localStorage.setItem("bpm-bg-" + kind, val ? "1" : "0"); } catch (e) {}
+}
+
+function openTextEditor(o) {
+  textTarget = o; textCreate = null;
+  document.getElementById("textModalTitle").textContent = o.kind === "callout" ? "Callout text" : "Text";
+  document.getElementById("tText").value = o.text || "";
+  document.getElementById("tBg").checked = o.kind === "callout" ? o.bg !== false : !!o.bg;
+  document.getElementById("tFmtRow").style.display = o.kind === "text" ? "flex" : "none";
+  fmtState = { bold:o.bold !== false, italic:!!o.italic, under:!!o.under, strike:!!o.strike };
+  refreshFmtBtns();
+  textModal.classList.add("show");
+  document.getElementById("tText").focus();
+}
+function openTextCreator(create) {
+  textTarget = null; textCreate = create;
+  document.getElementById("textModalTitle").textContent = create.mode === "callout" ? "Callout text" : "New text";
+  document.getElementById("tText").value = "";
+  document.getElementById("tBg").checked = stickyBg(create.mode);
+  document.getElementById("tFmtRow").style.display = create.mode === "text" ? "flex" : "none";
+  fmtState = { bold:true, italic:false, under:false, strike:false };
+  refreshFmtBtns();
+  textModal.classList.add("show");
+  document.getElementById("tText").focus();
+}
+document.getElementById("textCancel").onclick = () => { textModal.classList.remove("show"); textTarget = null; textCreate = null; };
 document.getElementById("textSave").onclick = () => {
-  if (textTarget) {
-    const v = document.getElementById("tText").value.trim();
-    if (v) {
-      pushUndo();
-      textTarget.text = v;
-      textTarget.bg = document.getElementById("tBg").checked;
+  const v = document.getElementById("tText").value.replace(/\s+$/, "");
+  const bg = document.getElementById("tBg").checked;
+  if (textTarget && v) {
+    pushUndo();
+    textTarget.text = textTarget.kind === "callout" ? v.replace(/\n+/g, " ") : v;
+    textTarget.bg = bg;
+    if (textTarget.kind === "text") FMT_KEYS.forEach(k => { textTarget[k] = fmtState[k]; });
+    saveStickyBg(textTarget.kind, bg);
+  } else if (textCreate && v) {
+    pushUndo();
+    saveStickyBg(textCreate.mode, bg);
+    if (textCreate.mode === "text") {
+      const t = { kind:"text", x:textCreate.x, y:textCreate.y, text:v, size:sizeVal(), color:penColor, bg:bg,
+                  bold:fmtState.bold, italic:fmtState.italic, under:fmtState.under, strike:fmtState.strike };
+      objects.push(t);
+      setSelection([t]);
+    } else {
+      textCreate.shape.text = v.replace(/\n+/g, " ");
+      textCreate.shape.bg = bg;
+      objects.push(textCreate.shape);
+      setSelection([textCreate.shape]);
     }
+    setTool("select");
   }
   textModal.classList.remove("show");
-  textTarget = null;
+  textTarget = null; textCreate = null;
   draw();
 };
 
