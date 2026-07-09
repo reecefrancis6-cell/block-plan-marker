@@ -83,8 +83,9 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.13 beta</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.14 beta</span></span>
     <button class="btn" id="btnPlans">&#9776; Plans</button>
+    <button class="btn" id="btnNew">&#65291; New</button>
     <button class="btn" id="btnOpenProj">&#128194; Open</button>
     <button class="btn" id="btnPhoto">&#128247; Photo</button>
     <button class="btn" id="btnSaveProj">&#128190; Save</button>
@@ -225,6 +226,18 @@
   </div>
 </div>
 
+<div class="modal" id="photoModal">
+  <div class="modalbox" style="max-width:380px">
+    <h3>Add photo</h3>
+    <p style="font-size:13px;color:#ccc;margin-bottom:12px">A plan is already loaded. What should this photo do?</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn primary" id="photoAdd">&#128444; Add onto current plan (moveable image)</button>
+      <button class="btn" id="photoReplace">&#8635; Replace the plan</button>
+      <button class="btn" id="photoCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="plansModal">
   <div class="modalbox" style="max-width:520px">
     <h3>My plans (saved on this device)</h3>
@@ -309,7 +322,7 @@ const TABS = [
   { id:"elec",   label:"Electrical" },
   { id:"markup", label:"Markup" }
 ];
-const PALETTE_COLORS = ["#d81e05", "#e07b00", "#f2c200", "#1b8a3f", "#00897b", "#0057d8", "#00a5c8", "#7b1fa2", "#d81b8c", "#6d4c41", "#757575", "#111111"];
+const PALETTE_COLORS = ["#d81e05", "#e07b00", "#f2c200", "#1b8a3f", "#00897b", "#0057d8", "#00a5c8", "#7b1fa2", "#d81b8c", "#6d4c41", "#757575", "#111111", "#ffffff"];
 
 /* ================= State ================= */
 let img = null;
@@ -631,6 +644,22 @@ function drawSym(c, o, scale) {
     c.restore();
   }
 
+  // info "!" badge (bottom-right) when Other info holds anything
+  if (o.info) {
+    const d3 = symDims(o);
+    const bx3 = x + (d3.w / 2) * scale, by3 = y + (d3.h / 2) * scale;
+    const br3 = Math.max(5 * scale, o.size * scale * 0.19);
+    c.save();
+    c.beginPath(); c.arc(bx3, by3, br3, 0, Math.PI * 2);
+    c.fillStyle = "#f2c200"; c.fill();
+    c.strokeStyle = "#ffffff"; c.lineWidth = Math.max(1, br3 * 0.16); c.stroke();
+    c.fillStyle = "#111111";
+    c.font = "bold " + (br3 * 1.4) + "px system-ui, sans-serif";
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText("!", bx3, by3 + br3 * 0.08);
+    c.restore();
+  }
+
   // failed cross badge
   if (o.failed) {
     const d = symDims(o);
@@ -695,31 +724,31 @@ function drawObjectInner(c, o, scale) {
   if (o.kind === "text") {
     const d = textBlockDims(o);
     c.save();
-    c.font = textFont(o, scale);
+    c.scale(scale, scale);
+    c.font = textFont(o, 1);
     if (o.bg) {
-      const pad = o.size * scale * 0.2;
+      const pad = o.size * 0.2;
       c.fillStyle = "#ffffff";
-      c.fillRect(o.x * scale - pad, o.y * scale - pad, d.w * scale + pad * 2, d.h * scale + pad * 2);
-      c.strokeStyle = o.color; c.lineWidth = Math.max(1, o.size * scale * 0.04);
-      c.strokeRect(o.x * scale - pad, o.y * scale - pad, d.w * scale + pad * 2, d.h * scale + pad * 2);
+      c.fillRect(o.x - pad, o.y - pad, d.w + pad * 2, d.h + pad * 2);
+      c.strokeStyle = o.color; c.lineWidth = Math.max(0.75, o.size * 0.04);
+      c.strokeRect(o.x - pad, o.y - pad, d.w + pad * 2, d.h + pad * 2);
     }
     c.fillStyle = o.color;
     c.textAlign = "left"; c.textBaseline = "top";
-    mctx.font = textFont(o, 1);
     d.lines.forEach((ln, i) => {
-      const ly = (o.y + i * o.size * 1.15) * scale;
-      c.fillText(ln, o.x * scale, ly);
-      const lw = mctx.measureText(ln).width * scale;
+      const ly = o.y + i * o.size * 1.15;
+      c.fillText(ln, o.x, ly);
       if (o.under || o.strike) {
+        const lw = mctx.measureText(ln).width;
         c.strokeStyle = o.color;
-        c.lineWidth = Math.max(1, o.size * scale * 0.06);
+        c.lineWidth = Math.max(0.75, o.size * 0.06);
         if (o.under) {
-          c.beginPath(); c.moveTo(o.x * scale, ly + o.size * scale * 1.04);
-          c.lineTo(o.x * scale + lw, ly + o.size * scale * 1.04); c.stroke();
+          c.beginPath(); c.moveTo(o.x, ly + o.size * 1.04);
+          c.lineTo(o.x + lw, ly + o.size * 1.04); c.stroke();
         }
         if (o.strike) {
-          c.beginPath(); c.moveTo(o.x * scale, ly + o.size * scale * 0.52);
-          c.lineTo(o.x * scale + lw, ly + o.size * scale * 0.52); c.stroke();
+          c.beginPath(); c.moveTo(o.x, ly + o.size * 0.52);
+          c.lineTo(o.x + lw, ly + o.size * 0.52); c.stroke();
         }
       }
     });
@@ -1561,6 +1590,30 @@ PALETTE_COLORS.forEach((c, i) => {
   swatchesEl.appendChild(s);
 });
 
+// custom colour picker swatch
+const customSw = document.createElement("div");
+customSw.className = "swatch";
+customSw.id = "customSwatch";
+customSw.title = "Custom colour";
+customSw.style.background = "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)";
+const customInput = document.createElement("input");
+customInput.type = "color";
+customInput.style.cssText = "position:absolute;width:1px;height:1px;opacity:0;pointer-events:none";
+customSw.onclick = () => customInput.click();
+customInput.addEventListener("input", () => {
+  penColor = customInput.value;
+  customSw.style.background = customInput.value;
+  document.querySelectorAll(".swatch").forEach(x => x.classList.remove("active"));
+  customSw.classList.add("active");
+  if (selection.length) {
+    selection.forEach(o => { o.color = customInput.value; });
+    requestDraw();
+  }
+});
+customInput.addEventListener("change", () => { if (selection.length) { scheduleAutosave(); } });
+swatchesEl.appendChild(customSw);
+swatchesEl.appendChild(customInput);
+
 /* ================= Labels toggle ================= */
 const btnLabels = document.getElementById("btnLabels");
 function refreshLabelsBtn() { btnLabels.classList.toggle("toggled", labelsOn); }
@@ -1602,10 +1655,29 @@ function loadImageFile(file) {
 }
 
 document.getElementById("btnPhoto").onclick = () => document.getElementById("fileInput").click();
+let pendingPhoto = null;
 document.getElementById("fileInput").addEventListener("change", e => {
-  if (e.target.files && e.target.files[0]) loadImageFile(e.target.files[0]);
+  const f = e.target.files && e.target.files[0];
   e.target.value = "";
+  if (!f) return;
+  if (!img) { loadImageFile(f); return; }
+  pendingPhoto = f;
+  document.getElementById("photoModal").classList.add("show");
 });
+document.getElementById("photoAdd").onclick = () => {
+  document.getElementById("photoModal").classList.remove("show");
+  if (pendingPhoto) insertImageObject(pendingPhoto);
+  pendingPhoto = null;
+};
+document.getElementById("photoReplace").onclick = () => {
+  document.getElementById("photoModal").classList.remove("show");
+  if (pendingPhoto) loadImageFile(pendingPhoto);
+  pendingPhoto = null;
+};
+document.getElementById("photoCancel").onclick = () => {
+  document.getElementById("photoModal").classList.remove("show");
+  pendingPhoto = null;
+};
 
 stage.addEventListener("dragover", e => e.preventDefault());
 stage.addEventListener("drop", e => {
@@ -1769,15 +1841,13 @@ document.getElementById("projInput").addEventListener("change", e => {
   e.target.value = "";
 });
 
-document.getElementById("imgObjInput").addEventListener("change", e => {
-  const f = e.target.files && e.target.files[0];
-  e.target.value = "";
+function insertImageObject(f) {
   if (!f || !img) { if (!img) alert("Load a block plan first."); return; }
   const reader = new FileReader();
   reader.onload = () => {
     const im = new Image();
     im.onload = () => {
-      const mx = 1000;
+      const mx = 1400;
       const sc = Math.min(1, mx / Math.max(im.naturalWidth, im.naturalHeight));
       const c = document.createElement("canvas");
       c.width = Math.round(im.naturalWidth * sc); c.height = Math.round(im.naturalHeight * sc);
@@ -1785,7 +1855,7 @@ document.getElementById("imgObjInput").addEventListener("change", e => {
       const src = c.toDataURL("image/jpeg", 0.85);
       const r = stage.getBoundingClientRect();
       const centre = toImage(r.width / 2, r.height / 2);
-      const w = img.naturalWidth * 0.3;
+      const w = img.naturalWidth * 0.35;
       const hh = w * (c.height / c.width);
       pushUndo();
       const o = { kind:"img", src:src, x:centre.x - w / 2, y:centre.y - hh / 2, w:w, h:hh };
@@ -1797,6 +1867,12 @@ document.getElementById("imgObjInput").addEventListener("change", e => {
     im.src = reader.result;
   };
   reader.readAsDataURL(f);
+}
+
+document.getElementById("imgObjInput").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  insertImageObject(f);
 });
 
 /* ================= Autosave (IndexedDB) ================= */
@@ -1942,6 +2018,20 @@ async function openPlan(id) {
   };
   im.src = d.image;
 }
+
+document.getElementById("btnNew").onclick = () => {
+  if (img && !window.confirm("Start a new blank plan? Unsaved work on the current plan will be lost (saved Plans are kept).")) return;
+  img = null; imgDataUrl = null;
+  objects = []; clearSelection();
+  undoStack = []; redoStack = [];
+  siteNotes = ""; pageBaseH = null;
+  currentProjId = null; fileHandle = null;
+  document.getElementById("dropHint").classList.remove("hidden");
+  idbDel("autosave").catch(() => {});
+  lastSaveNote = "";
+  updateStatus();
+  draw();
+};
 
 document.getElementById("btnPlans").onclick = () => {
   renderPlansList();
@@ -2241,7 +2331,6 @@ function endPointer(e) {
         pushUndo();
         objects.push(tempShape);
         setSelection([tempShape]);
-        setTool("select");
       }
     }
     tempShape = null; shapeStart = null; dragMode = null;
@@ -2769,6 +2858,21 @@ function renderExportCanvas() {
     sc.fillText(label, x + d.w / 2 + lh * 0.2, cy);
     x += d.w / 2 + lh * 0.2 + sc.measureText(label).width + lh * 0.7;
   });
+
+  if (activeTool === "test") {
+    const br = lh * 0.26;
+    sc.beginPath(); sc.arc(x + br, cy, br, 0, Math.PI * 2);
+    sc.fillStyle = "#1b8a3f"; sc.fill();
+    sc.strokeStyle = "#ffffff"; sc.lineWidth = br * 0.2; sc.lineCap = "round";
+    sc.beginPath();
+    sc.moveTo(x + br - br * 0.45, cy + br * 0.05);
+    sc.lineTo(x + br - br * 0.1, cy + br * 0.42);
+    sc.lineTo(x + br + br * 0.5, cy - br * 0.35);
+    sc.stroke();
+    sc.fillStyle = "#222";
+    sc.font = "bold " + Math.round(lh * 0.38) + "px system-ui, sans-serif";
+    sc.fillText("= tested " + testYearSel, x + br * 2 + lh * 0.15, cy);
+  }
 
   zoneKeys.forEach((z, i) => {
     const zy = out.height + 4 + lh + 8 + zoneRowH * i + zoneRowH / 2;
