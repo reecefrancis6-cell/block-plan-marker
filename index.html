@@ -83,7 +83,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.16 beta</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.17 beta</span></span>
     <button class="btn" id="btnPlans">&#9776; Plans</button>
     <button class="btn" id="btnNew">&#65291; New</button>
     <button class="btn" id="btnOpenProj">&#128194; Open</button>
@@ -101,6 +101,7 @@
     <input type="file" id="fileInput" accept="image/*">
     <input type="file" id="projInput">
     <input type="file" id="imgObjInput" accept="image/*">
+    <input type="file" id="cameraInput" accept="image/*" capture="environment">
   </div>
 
   <div id="toolrow">
@@ -146,6 +147,8 @@
     <button class="btn" id="btnSame" disabled title="Select all of this type">Select same</button>
     <button class="btn" id="btnGroup" disabled>Group</button>
     <button class="btn" id="btnUngroup" disabled>Ungroup</button>
+    <button class="btn" id="btnCopy" disabled title="Copy (Ctrl+C)">Copy</button>
+    <button class="btn" id="btnPaste" disabled title="Paste (Ctrl+V)">Paste</button>
     <button class="btn" id="btnDup" disabled>Duplicate</button>
     <button class="btn" id="btnDel" disabled>Delete</button>
     <button class="btn" id="btnFlatten" disabled title="Permanently burn selection into the plan">Flatten</button>
@@ -163,8 +166,11 @@
     <label>Device number</label><input type="text" id="dDev" autocomplete="off">
     <label>Other info</label><input type="text" id="dInfo" autocomplete="off">
     <div id="dbaFields" style="display:none">
-      <label>A = (dBA)</label><input type="text" id="dVa" autocomplete="off">
-      <label>E = (dBA)</label><input type="text" id="dVe" autocomplete="off">
+      <label>A = (dBA, ambient — lowest reading)</label>
+      <div style="display:flex;gap:6px"><input type="text" id="dVa" autocomplete="off" style="flex:1"><button class="btn" id="mA" type="button">Measure</button></div>
+      <label>E = (dBA, evac — highest reading)</label>
+      <div style="display:flex;gap:6px"><input type="text" id="dVe" autocomplete="off" style="flex:1"><button class="btn" id="mE" type="button">Measure</button></div>
+      <div id="mLive" style="font-size:13px;color:#4caf50;min-height:18px;margin-top:6px"></div>
     </div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;color:#e8e8e8">
       <input type="checkbox" id="dFailed" style="width:18px;height:18px"> Failed
@@ -229,6 +235,35 @@
       <button class="btn" id="notesCancel">Cancel</button>
       <button class="btn primary" id="notesSave">Save</button>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="photosModal">
+  <div class="modalbox" style="max-width:540px">
+    <h3>Site photos</h3>
+    <div id="photosList"></div>
+    <div class="row">
+      <button class="btn" id="photosAdd">&#128247; Take / add photo</button>
+      <button class="btn" id="photosClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="meterModal">
+  <div class="modalbox" style="max-width:380px;text-align:center">
+    <h3>Sound meter <span style="font-size:11px;color:#888">(indicative — not a calibrated instrument)</span></h3>
+    <div id="meterLive" style="font-size:52px;font-weight:800;margin:8px 0">--</div>
+    <div style="font-size:13px;color:#aaa;margin-bottom:10px">min <span id="meterMin">--</span> · max <span id="meterMax">--</span> dBA</div>
+    <button class="btn primary" id="meterToggle">&#127908; Start</button>
+    <div style="margin-top:14px;font-size:12px;color:#aaa;text-align:left">
+      Calibrate: enter the reading from your real meter while both are measuring
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <input type="text" id="calInput" inputmode="decimal" placeholder="e.g. 62.5" style="flex:1;background:#1a1d21;border:1px solid #444;border-radius:6px;color:#e8e8e8;padding:7px">
+        <button class="btn" id="calSet">Set</button>
+      </div>
+      <div id="calNote" style="margin-top:4px;color:#888"></div>
+    </div>
+    <div class="row"><button class="btn" id="meterClose">Close</button></div>
   </div>
 </div>
 
@@ -300,11 +335,24 @@ const TYPES = [
   { id:"exitl",    tab:"exit", label:"Exit Left",    glyph:"exit",     text:"EXIT",  arrow:"l", color:"#1b8a3f" },
   { id:"exit",     tab:"exit", label:"Exit",         glyph:"exit",     text:"EXIT",  arrow:"",  color:"#1b8a3f" },
   { id:"exitr",    tab:"exit", label:"Exit Right",   glyph:"exit",     text:"EXIT",  arrow:"r", color:"#1b8a3f" },
-  { id:"db",       tab:"elec", label:"DB Board",     glyph:"db",       text:"",      color:"#111111" }
+  { id:"db",       tab:"elec", label:"DB Board",     glyph:"db",       text:"",      color:"#111111" },
+  { id:"door",     tab:"bldg", label:"Door",         glyph:"door",     text:"",      color:"#111111" },
+  { id:"dbldoor",  tab:"bldg", label:"Double Door",  glyph:"dbldoor",  text:"",      color:"#111111" },
+  { id:"sldoor",   tab:"bldg", label:"Sliding Door", glyph:"sldoor",   text:"",      color:"#111111" },
+  { id:"rldoor",   tab:"bldg", label:"Roller Door",  glyph:"rldoor",   text:"",      color:"#111111" },
+  { id:"window",   tab:"bldg", label:"Window",       glyph:"window",   text:"",      color:"#111111" },
+  { id:"opening",  tab:"bldg", label:"Opening",      glyph:"opening",  text:"",      color:"#111111" },
+  { id:"stair",    tab:"bldg", label:"Stairs",       glyph:"stair",    text:"",      color:"#111111" },
+  { id:"lstair",   tab:"bldg", label:"L Stairs",     glyph:"lstair",   text:"",      color:"#111111" }
 ];
 const TYPE_MAP = {}; TYPES.forEach(t => TYPE_MAP[t.id] = t);
 const OLD_TYPE_MAP = { heat:"thermal", cheat:"cthermal" };
 
+const TOOLS_TAB = [
+  { id:"meter",  label:"Sound meter", icon:"🎚" },
+  { id:"camera", label:"Camera",      icon:"📷" },
+  { id:"photos", label:"Site photos", icon:"🖼" }
+];
 const MARKUP_TOOLS = [
   { id:"pen",     label:"Pen",         icon:"✏️" },
   { id:"hl",      label:"Highlighter", icon:"🖍️" },
@@ -326,7 +374,9 @@ const TABS = [
   { id:"fire",   label:"Fire" },
   { id:"exit",   label:"Exit" },
   { id:"elec",   label:"Electrical" },
-  { id:"markup", label:"Markup" }
+  { id:"bldg",   label:"Building" },
+  { id:"markup", label:"Markup" },
+  { id:"tools",  label:"Tools" }
 ];
 const PALETTE_COLORS = ["#d81e05", "#f2c200", "#1b8a3f", "#0057d8", "#111111", "#ffffff"];
 
@@ -348,6 +398,8 @@ let siteNotes = "";
 let pageBaseH = null;
 let testYearSel = 2026;
 let lineStyle = "solid";
+let sitePhotos = [];
+let clipboardObjs = [];
 
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
@@ -400,6 +452,12 @@ function symDims(o) {   // image-space width/height (before rotation)
   else if (t.glyph === "horn") { w = s * 1.7; h = s; }
   else if (t.glyph === "sndr") { w = s * 1.35; h = s * 0.8; }
   else if (t.glyph === "dba") { w = s * 1.4; h = s * 1.9; }
+  else if (t.glyph === "door") { w = s * 1.35; h = s * 1.2; }
+  else if (t.glyph === "dbldoor") { w = s * 1.9; h = s * 1.1; }
+  else if (t.glyph === "sldoor" || t.glyph === "rldoor") { w = s * 1.8; h = s * 0.55; }
+  else if (t.glyph === "window" || t.glyph === "opening") { w = s * 1.6; h = s * 0.4; }
+  else if (t.glyph === "stair") { w = s * 1.8; h = s; }
+  else if (t.glyph === "lstair") { w = s * 1.45; h = s * 1.45; }
   else if (t.glyph === "db") { w = s * 1.9; h = s * 1.15; }
   if ((o.rot || 0) % 180 === 90) { const tmp = w; w = h; h = tmp; }
   return { w, h };
@@ -556,6 +614,93 @@ function drawSym(c, o, scale) {
     [0.32, 0.52, 0.72].forEach(f => {
       c.beginPath(); c.arc(bx + w * 0.56, 0, w * f * 0.6, -Math.PI / 3.2, Math.PI / 3.2); c.stroke();
     });
+  } else if (t.glyph === "door") {
+    c.strokeStyle = col; c.lineWidth = Math.max(1.2, s * 0.08); c.lineCap = "round";
+    const dw = s;
+    c.beginPath();
+    c.moveTo(-dw / 2 - s * 0.17, s * 0.5); c.lineTo(-dw / 2, s * 0.5);
+    c.moveTo(dw / 2, s * 0.5); c.lineTo(dw / 2 + s * 0.17, s * 0.5);
+    c.stroke();
+    c.beginPath(); c.moveTo(-dw / 2, s * 0.5); c.lineTo(-dw / 2, s * 0.5 - dw); c.stroke();
+    c.beginPath(); c.arc(-dw / 2, s * 0.5, dw, -Math.PI / 2, 0); c.stroke();
+  } else if (t.glyph === "dbldoor") {
+    c.strokeStyle = col; c.lineWidth = Math.max(1.2, s * 0.08); c.lineCap = "round";
+    const lw2 = s * 0.9;
+    c.beginPath();
+    c.moveTo(-lw2 - s * 0.15, s * 0.5); c.lineTo(-lw2, s * 0.5);
+    c.moveTo(lw2, s * 0.5); c.lineTo(lw2 + s * 0.15, s * 0.5);
+    c.stroke();
+    c.beginPath(); c.moveTo(-lw2, s * 0.5); c.lineTo(-lw2, s * 0.5 - lw2); c.stroke();
+    c.beginPath(); c.arc(-lw2, s * 0.5, lw2, -Math.PI / 2, 0); c.stroke();
+    c.beginPath(); c.moveTo(lw2, s * 0.5); c.lineTo(lw2, s * 0.5 - lw2); c.stroke();
+    c.beginPath(); c.arc(lw2, s * 0.5, lw2, Math.PI, Math.PI * 1.5); c.stroke();
+  } else if (t.glyph === "sldoor") {
+    c.strokeStyle = col; c.lineWidth = Math.max(1.2, s * 0.09); c.lineCap = "butt";
+    c.beginPath();
+    c.moveTo(-s * 0.9, -s * 0.09); c.lineTo(s * 0.12, -s * 0.09);
+    c.moveTo(-s * 0.12, s * 0.09); c.lineTo(s * 0.9, s * 0.09);
+    c.stroke();
+    c.lineWidth = Math.max(1, s * 0.05);
+    c.strokeRect(-s * 0.9, -s * 0.2, s * 1.8, s * 0.4);
+  } else if (t.glyph === "rldoor") {
+    c.strokeStyle = col; c.lineWidth = Math.max(1, s * 0.06);
+    c.strokeRect(-s * 0.9, -s * 0.22, s * 1.8, s * 0.44);
+    c.beginPath();
+    for (let xx = -s * 0.72; xx <= s * 0.72; xx += s * 0.18) {
+      c.moveTo(xx, -s * 0.22); c.lineTo(xx, s * 0.22);
+    }
+    c.stroke();
+  } else if (t.glyph === "window") {
+    c.strokeStyle = col; c.lineWidth = Math.max(1, s * 0.06); c.lineCap = "butt";
+    c.beginPath();
+    [-s * 0.14, 0, s * 0.14].forEach(yy => { c.moveTo(-s * 0.8, yy); c.lineTo(s * 0.8, yy); });
+    c.moveTo(-s * 0.8, -s * 0.14); c.lineTo(-s * 0.8, s * 0.14);
+    c.moveTo(s * 0.8, -s * 0.14); c.lineTo(s * 0.8, s * 0.14);
+    c.stroke();
+  } else if (t.glyph === "opening") {
+    c.strokeStyle = col; c.lineWidth = Math.max(1.2, s * 0.08); c.lineCap = "butt";
+    c.beginPath();
+    c.moveTo(-s * 0.8, -s * 0.16); c.lineTo(-s * 0.8, s * 0.16);
+    c.moveTo(s * 0.8, -s * 0.16); c.lineTo(s * 0.8, s * 0.16);
+    c.stroke();
+    c.setLineDash([s * 0.12, s * 0.1]);
+    c.beginPath(); c.moveTo(-s * 0.8, 0); c.lineTo(s * 0.8, 0); c.stroke();
+    c.setLineDash([]);
+  } else if (t.glyph === "stair") {
+    c.strokeStyle = col; c.lineWidth = Math.max(1, s * 0.055); c.lineCap = "butt";
+    c.strokeRect(-s * 0.9, -s * 0.5, s * 1.8, s);
+    c.beginPath();
+    for (let xx = -s * 0.72; xx <= s * 0.72; xx += s * 0.18) {
+      c.moveTo(xx, -s * 0.5); c.lineTo(xx, s * 0.5);
+    }
+    c.stroke();
+    c.lineWidth = Math.max(1.2, s * 0.08); c.lineCap = "round";
+    c.beginPath(); c.moveTo(-s * 0.78, 0); c.lineTo(s * 0.68, 0); c.stroke();
+    c.beginPath();
+    c.moveTo(s * 0.68, 0); c.lineTo(s * 0.48, -s * 0.14);
+    c.moveTo(s * 0.68, 0); c.lineTo(s * 0.48, s * 0.14);
+    c.stroke();
+  } else if (t.glyph === "lstair") {
+    c.strokeStyle = col; c.lineWidth = Math.max(1, s * 0.055); c.lineCap = "butt";
+    // horizontal arm (top) and vertical arm (right) meeting at a landing
+    c.strokeRect(-s * 0.72, -s * 0.72, s * 1.44, s * 0.5);
+    c.strokeRect(s * 0.22, -s * 0.72, s * 0.5, s * 1.44);
+    c.beginPath();
+    for (let xx = -s * 0.58; xx <= s * 0.1; xx += s * 0.17) {
+      c.moveTo(xx, -s * 0.72); c.lineTo(xx, -s * 0.22);
+    }
+    for (let yy = -s * 0.08; yy <= s * 0.58; yy += s * 0.17) {
+      c.moveTo(s * 0.22, yy); c.lineTo(s * 0.72, yy);
+    }
+    c.stroke();
+    c.lineWidth = Math.max(1.2, s * 0.08); c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(-s * 0.62, -s * 0.47); c.lineTo(s * 0.47, -s * 0.47); c.lineTo(s * 0.47, s * 0.58);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(s * 0.47, s * 0.58); c.lineTo(s * 0.33, s * 0.4);
+    c.moveTo(s * 0.47, s * 0.58); c.lineTo(s * 0.61, s * 0.4);
+    c.stroke();
   } else if (t.glyph === "db") {
     const w = s * 1.9, h = s * 1.15;
     c.fillStyle = "#ffffff"; c.strokeStyle = col;
@@ -1246,6 +1391,8 @@ function updateSelButtons() {
   document.getElementById("btnGroup").disabled = selection.length < 2;
   document.getElementById("btnUngroup").disabled = !selection.some(o => o.grp);
   document.getElementById("btnFlatten").disabled = !any;
+  document.getElementById("btnCopy").disabled = !any;
+  document.getElementById("btnPaste").disabled = !clipboardObjs.length || !img;
   const styleTargets = selection.filter(o => (o.kind === "shape" && (o.shape === "line" || o.shape === "arrow" || o.shape === "rect" || o.shape === "ellipse")));
   const swp = document.getElementById("styleWrap");
   const toolStylable = ["line", "arrow", "rect", "ellipse"].includes(activeTool);
@@ -1585,7 +1732,7 @@ function entriesForTab(tab) {
   if (tab === "fav") {
     return favIds.map(id => {
       if (TYPE_MAP[id]) return { kind:"sym", t:TYPE_MAP[id] };
-      const m = MARKUP_TOOLS.find(mt => mt.id === id);
+      const m = MARKUP_TOOLS.find(mt => mt.id === id) || TOOLS_TAB.find(mt => mt.id === id);
       return m ? { kind:"tool", t:m } : null;
     }).filter(Boolean);
   }
@@ -1593,6 +1740,7 @@ function entriesForTab(tab) {
     const ids = applyOrder(MARKUP_TOOLS.map(t => t.id), tab);
     return ids.map(id => ({ kind:"tool", t:MARKUP_TOOLS.find(m => m.id === id) })).filter(e => e.t);
   }
+  if (tab === "tools") return TOOLS_TAB.map(t => ({ kind:"tool", t }));
   const ids = applyOrder(TYPES.filter(t => t.tab === tab).map(t => t.id), tab);
   return ids.map(id => ({ kind:"sym", t:TYPE_MAP[id] })).filter(e => e.t);
 }
@@ -1630,6 +1778,9 @@ function buildPalette() {
     d.appendChild(cnt);
     d.onclick = () => {
       if (t.id === "image") { document.getElementById("imgObjInput").click(); return; }
+      if (t.id === "camera") { document.getElementById("cameraInput").click(); return; }
+      if (t.id === "meter") { openMeter(); return; }
+      if (t.id === "photos") { openPhotosGallery(); return; }
       setTool(t.id);
     };
     attachLongPress(d, t.id);
@@ -1777,14 +1928,17 @@ document.getElementById("fileInput").addEventListener("change", e => {
   pendingPhoto = f;
   document.getElementById("photoModal").classList.add("show");
 });
+function pendingIsPdf() {
+  return pendingPhoto && (pendingPhoto.type === "application/pdf" || (pendingPhoto.name || "").toLowerCase().endsWith(".pdf"));
+}
 document.getElementById("photoAdd").onclick = () => {
   document.getElementById("photoModal").classList.remove("show");
-  if (pendingPhoto) insertImageObject(pendingPhoto);
+  if (pendingPhoto) { if (pendingIsPdf()) loadPdfFile(pendingPhoto, true); else insertImageObject(pendingPhoto); }
   pendingPhoto = null;
 };
 document.getElementById("photoReplace").onclick = () => {
   document.getElementById("photoModal").classList.remove("show");
-  if (pendingPhoto) loadImageFile(pendingPhoto);
+  if (pendingPhoto) { if (pendingIsPdf()) loadPdfFile(pendingPhoto); else loadImageFile(pendingPhoto); }
   pendingPhoto = null;
 };
 document.getElementById("photoCancel").onclick = () => {
@@ -1824,7 +1978,7 @@ function ensurePdfJs() {
   return pdfjsReady;
 }
 
-function loadPdfFile(file) {
+function loadPdfFile(file, asObject) {
   statusEl.textContent = "Opening PDF…";
   ensurePdfJs()
     .then(() => file.arrayBuffer())
@@ -1847,6 +2001,11 @@ function loadPdfFile(file) {
       cx2.fillRect(0, 0, c.width, c.height);
       await page.render({ canvasContext: cx2, viewport: vp }).promise;
       const dataUrl = c.toDataURL("image/jpeg", 0.92);
+      if (asObject && img) {
+        insertImageFromDataUrl(dataUrl, c.width, c.height);
+        updateStatus();
+        return;
+      }
       const im = new Image();
       im.onload = () => setImage(im, dataUrl, false);
       im.src = dataUrl;
@@ -1860,8 +2019,15 @@ function loadPdfFile(file) {
 function openAnyFile(file) {
   if (!file) return;
   const name = (file.name || "").toLowerCase();
-  if (file.type === "application/pdf" || name.endsWith(".pdf")) loadPdfFile(file);
-  else if (file.type && file.type.indexOf("image") === 0) loadImageFile(file);
+  const isPdf = file.type === "application/pdf" || name.endsWith(".pdf");
+  const isImg = file.type && file.type.indexOf("image") === 0;
+  if ((isPdf || isImg) && img) {
+    pendingPhoto = file;
+    document.getElementById("photoModal").classList.add("show");
+    return;
+  }
+  if (isPdf) loadPdfFile(file);
+  else if (isImg) loadImageFile(file);
   else loadProjectFile(file);
 }
 
@@ -1888,7 +2054,7 @@ function deliverFile(blob, name, mime) {
 }
 
 function projectBlob() {
-  const proj = { app:"block-plan-marker", version:5, image:imgDataUrl, objects:objects, labelsOn:labelsOn, siteNotes:siteNotes, pageBaseH:pageBaseH };
+  const proj = { app:"block-plan-marker", version:6, image:imgDataUrl, objects:objects, labelsOn:labelsOn, siteNotes:siteNotes, pageBaseH:pageBaseH, sitePhotos:sitePhotos };
   return new Blob([JSON.stringify(proj)], { type:"application/json" });
 }
 
@@ -1950,6 +2116,7 @@ function loadProjectFile(file) {
         if (typeof proj.labelsOn === "boolean") { labelsOn = proj.labelsOn; refreshLabelsBtn(); }
         siteNotes = proj.siteNotes || "";
         pageBaseH = proj.pageBaseH || null;
+        sitePhotos = proj.sitePhotos || [];
         undoStack = []; redoStack = [];
         currentProjId = null;
         fileHandle = null;
@@ -1968,6 +2135,19 @@ document.getElementById("projInput").addEventListener("change", e => {
   e.target.value = "";
 });
 
+function insertImageFromDataUrl(src, iw, ih) {
+  const r = stage.getBoundingClientRect();
+  const centre = toImage(r.width / 2, r.height / 2);
+  const w = img.naturalWidth * 0.35;
+  const hh = w * (ih / iw);
+  pushUndo();
+  const o = { kind:"img", src:src, x:centre.x - w / 2, y:centre.y - hh / 2, w:w, h:hh };
+  objects.push(o);
+  setSelection([o]);
+  setTool("select");
+  draw();
+}
+
 function insertImageObject(f) {
   if (!f || !img) { if (!img) alert("Load a block plan first."); return; }
   const reader = new FileReader();
@@ -1979,17 +2159,7 @@ function insertImageObject(f) {
       const c = document.createElement("canvas");
       c.width = Math.round(im.naturalWidth * sc); c.height = Math.round(im.naturalHeight * sc);
       c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-      const src = c.toDataURL("image/jpeg", 0.85);
-      const r = stage.getBoundingClientRect();
-      const centre = toImage(r.width / 2, r.height / 2);
-      const w = img.naturalWidth * 0.35;
-      const hh = w * (c.height / c.width);
-      pushUndo();
-      const o = { kind:"img", src:src, x:centre.x - w / 2, y:centre.y - hh / 2, w:w, h:hh };
-      objects.push(o);
-      setSelection([o]);
-      setTool("select");
-      draw();
+      insertImageFromDataUrl(c.toDataURL("image/jpeg", 0.85), c.width, c.height);
     };
     im.src = reader.result;
   };
@@ -2043,7 +2213,7 @@ async function autosaveNow() {
   if (!img || !autosaveDirty) return;
   autosaveDirty = false;
   try {
-    await idbPut("autosave", { image:imgDataUrl, objects:objects, labelsOn:labelsOn, siteNotes:siteNotes, pageBaseH:pageBaseH, t:Date.now() });
+    await idbPut("autosave", { image:imgDataUrl, objects:objects, labelsOn:labelsOn, siteNotes:siteNotes, pageBaseH:pageBaseH, sitePhotos:sitePhotos, t:Date.now() });
     if (currentProjId) {
       await idbPut("proj:" + currentProjId, planSnapshot());
       const ix = (await idbGet("projIndex")) || [];
@@ -2066,6 +2236,7 @@ async function tryRestoreAutosave() {
       if (typeof a.labelsOn === "boolean") { labelsOn = a.labelsOn; refreshLabelsBtn(); }
       siteNotes = a.siteNotes || "";
       pageBaseH = a.pageBaseH || null;
+      sitePhotos = a.sitePhotos || [];
       setImage(im, a.image, true);
       lastSaveNote = "Restored autosave from " + new Date(a.t).toTimeString().slice(0, 5); updateStatus();
     };
@@ -2077,7 +2248,7 @@ async function tryRestoreAutosave() {
 let currentProjId = null;
 
 function planSnapshot() {
-  return { image:imgDataUrl, objects:objects, labelsOn:labelsOn, siteNotes:siteNotes, pageBaseH:pageBaseH };
+  return { image:imgDataUrl, objects:objects, labelsOn:labelsOn, siteNotes:siteNotes, pageBaseH:pageBaseH, sitePhotos:sitePhotos };
 }
 function makeThumb() {
   const tw = 220;
@@ -2136,6 +2307,7 @@ async function openPlan(id) {
     labelsOn = d.labelsOn !== false; refreshLabelsBtn();
     siteNotes = d.siteNotes || "";
     pageBaseH = d.pageBaseH || null;
+    sitePhotos = d.sitePhotos || [];
     undoStack = []; redoStack = [];
     fileHandle = null;
     currentProjId = id;
@@ -2151,7 +2323,7 @@ document.getElementById("btnNew").onclick = () => {
   img = null; imgDataUrl = null;
   objects = []; clearSelection();
   undoStack = []; redoStack = [];
-  siteNotes = ""; pageBaseH = null;
+  siteNotes = ""; pageBaseH = null; sitePhotos = [];
   currentProjId = null; fileHandle = null;
   document.getElementById("dropHint").classList.remove("hidden");
   idbDel("autosave").catch(() => {});
@@ -2178,6 +2350,227 @@ document.getElementById("planSaveNew").onclick = async () => {
   renderPlansList();
   noteSaved("Saved plan");
 };
+
+
+/* ================= Copy / paste ================= */
+function copySelection() {
+  if (!selection.length) return;
+  clipboardObjs = selection.map(o => JSON.stringify(o));
+  noteSaved("Copied " + selection.length);
+  updateSelButtons();
+}
+function pasteClipboard() {
+  if (!clipboardObjs.length || !img) return;
+  pushUndo();
+  const clones = clipboardObjs.map(s => JSON.parse(s));
+  // centre of copied content -> current view centre
+  let cx1 = Infinity, cy1 = Infinity, cx2 = -Infinity, cy2 = -Infinity;
+  clones.forEach(o => {
+    const b = objectBounds(o);
+    cx1 = Math.min(cx1, b.x1); cy1 = Math.min(cy1, b.y1);
+    cx2 = Math.max(cx2, b.x2); cy2 = Math.max(cy2, b.y2);
+  });
+  const r = stage.getBoundingClientRect();
+  const vc = toImage(r.width / 2, r.height / 2);
+  const dx = vc.x - (cx1 + cx2) / 2, dy = vc.y - (cy1 + cy2) / 2;
+  const grpMap = {};
+  clones.forEach((o, i) => {
+    if (o.grp) {
+      if (!grpMap[o.grp]) grpMap[o.grp] = "g" + Date.now() + "_" + i;
+      o.grp = grpMap[o.grp];
+    }
+    if (o.kind === "ink") o.points.forEach(pt => { pt.x += dx; pt.y += dy; });
+    else if (o.pts) o.pts.forEach(pt => { pt.x += dx; pt.y += dy; });
+    else if (o.kind === "shape" || o.kind === "callout") {
+      o.x1 += dx; o.y1 += dy; o.x2 += dx; o.y2 += dy;
+      if (o.cx != null) { o.cx += dx; o.cy += dy; }
+    } else { o.x += dx; o.y += dy; }
+  });
+  objects.push(...clones);
+  setSelection(clones);
+  setTool("select");
+  draw();
+}
+document.getElementById("btnCopy").onclick = copySelection;
+document.getElementById("btnPaste").onclick = pasteClipboard;
+
+/* ================= Site photos ================= */
+document.getElementById("cameraInput").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      const mx = 1200;
+      const sc = Math.min(1, mx / Math.max(im.naturalWidth, im.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(im.naturalWidth * sc); c.height = Math.round(im.naturalHeight * sc);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      sitePhotos.push({ src:c.toDataURL("image/jpeg", 0.8), t:Date.now(), note:"" });
+      scheduleAutosave();
+      openPhotosGallery();
+    };
+    im.src = reader.result;
+  };
+  reader.readAsDataURL(f);
+});
+
+function openPhotosGallery() {
+  const wrap = document.getElementById("photosList");
+  if (!sitePhotos.length) {
+    wrap.innerHTML = '<p style="font-size:13px;color:#888">No site photos yet — use the Camera tool or the button below.</p>';
+  } else {
+    wrap.innerHTML = "";
+    sitePhotos.forEach((ph, i) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:10px;align-items:center;padding:7px;border:1px solid #3a3f46;border-radius:8px;margin-bottom:7px;background:#1f2328";
+      const im = document.createElement("img");
+      im.src = ph.src;
+      im.style.cssText = "width:86px;height:64px;object-fit:cover;border-radius:4px;flex:0 0 auto";
+      const mid = document.createElement("div");
+      mid.style.cssText = "flex:1;min-width:0";
+      const note = document.createElement("input");
+      note.type = "text"; note.value = ph.note || ""; note.placeholder = "note…";
+      note.style.cssText = "width:100%;background:#1a1d21;border:1px solid #444;border-radius:6px;color:#e8e8e8;padding:6px;font-size:13px";
+      note.addEventListener("change", () => { ph.note = note.value; scheduleAutosave(); });
+      const when = document.createElement("div");
+      when.style.cssText = "font-size:11px;color:#888;margin-top:3px";
+      when.textContent = new Date(ph.t).toLocaleString();
+      mid.appendChild(note); mid.appendChild(when);
+      const share = document.createElement("button");
+      share.className = "btn"; share.textContent = "⬆";
+      share.title = "Save / share this photo";
+      share.onclick = () => {
+        const bin = atob(ph.src.split(",")[1]);
+        const arr = new Uint8Array(bin.length);
+        for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
+        deliverFile(new Blob([arr], { type:"image/jpeg" }), "site-photo-" + (i + 1) + ".jpg", "image/jpeg");
+      };
+      const del = document.createElement("button");
+      del.className = "btn"; del.textContent = "✕";
+      del.onclick = () => {
+        if (!window.confirm("Delete this photo?")) return;
+        sitePhotos.splice(i, 1);
+        scheduleAutosave();
+        openPhotosGallery();
+      };
+      row.appendChild(im); row.appendChild(mid); row.appendChild(share); row.appendChild(del);
+      wrap.appendChild(row);
+    });
+  }
+  document.getElementById("photosModal").classList.add("show");
+}
+document.getElementById("photosAdd").onclick = () => document.getElementById("cameraInput").click();
+document.getElementById("photosClose").onclick = () => document.getElementById("photosModal").classList.remove("show");
+
+/* ================= Sound meter (Web Audio, indicative) ================= */
+let meterStream = null, meterCtx = null, meterAnalyser = null, meterTimer2 = null;
+let meterMinV = Infinity, meterMaxV = -Infinity, meterLastRaw = null, meterBegan = 0;
+let calOffset = 0;
+try { calOffset = parseFloat(localStorage.getItem("bpm-cal")) || 0; } catch (e) {}
+let meterOnTick = null;
+
+async function meterStart(onTick) {
+  meterStream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+  });
+  meterCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (meterCtx.state === "suspended") await meterCtx.resume();
+  const src = meterCtx.createMediaStreamSource(meterStream);
+  meterAnalyser = meterCtx.createAnalyser();
+  meterAnalyser.fftSize = 2048;
+  src.connect(meterAnalyser);
+  const buf = new Float32Array(meterAnalyser.fftSize);
+  meterMinV = Infinity; meterMaxV = -Infinity; meterBegan = Date.now();
+  meterOnTick = onTick;
+  meterTimer2 = setInterval(() => {
+    meterAnalyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    const rms = Math.sqrt(sum / buf.length);
+    const db = rms > 0 ? Math.max(20, Math.min(130, 20 * Math.log10(rms) + 94 + calOffset)) : 20;
+    meterLastRaw = db - calOffset;
+    if (Date.now() - meterBegan > 400) {
+      meterMinV = Math.min(meterMinV, db);
+      meterMaxV = Math.max(meterMaxV, db);
+    }
+    if (meterOnTick) meterOnTick(db, meterMinV, meterMaxV);
+  }, 120);
+}
+function meterStop() {
+  if (meterTimer2) { clearInterval(meterTimer2); meterTimer2 = null; }
+  if (meterStream) { meterStream.getTracks().forEach(tr => tr.stop()); meterStream = null; }
+  if (meterCtx) { meterCtx.close().catch(() => {}); meterCtx = null; }
+  meterOnTick = null;
+}
+function meterRunning() { return !!meterTimer2; }
+const fmtDb = v => (v === Infinity || v === -Infinity || v == null) ? "--" : v.toFixed(1);
+
+function openMeter() {
+  document.getElementById("calNote").textContent = calOffset ? ("Offset applied: " + (calOffset > 0 ? "+" : "") + calOffset.toFixed(1) + " dB") : "No calibration offset set";
+  document.getElementById("meterModal").classList.add("show");
+}
+document.getElementById("meterToggle").onclick = async () => {
+  const btn = document.getElementById("meterToggle");
+  if (meterRunning()) {
+    meterStop();
+    btn.innerHTML = "&#127908; Start";
+    return;
+  }
+  try {
+    btn.textContent = "Stop";
+    await meterStart((db, mn, mx) => {
+      document.getElementById("meterLive").textContent = fmtDb(db);
+      document.getElementById("meterMin").textContent = fmtDb(mn);
+      document.getElementById("meterMax").textContent = fmtDb(mx);
+    });
+  } catch (err) {
+    btn.innerHTML = "&#127908; Start";
+    alert("Couldn't access the microphone. Allow mic access for this app and try again.");
+  }
+};
+document.getElementById("calSet").onclick = () => {
+  const v = parseFloat(document.getElementById("calInput").value);
+  if (isNaN(v) || meterLastRaw == null) { alert("Start the meter first, then enter your real meter's reading."); return; }
+  calOffset = +(v - meterLastRaw).toFixed(1);
+  try { localStorage.setItem("bpm-cal", String(calOffset)); } catch (e) {}
+  document.getElementById("calNote").textContent = "Offset applied: " + (calOffset > 0 ? "+" : "") + calOffset.toFixed(1) + " dB";
+};
+document.getElementById("meterClose").onclick = () => {
+  meterStop();
+  document.getElementById("meterToggle").innerHTML = "&#127908; Start";
+  document.getElementById("meterModal").classList.remove("show");
+};
+
+/* dBA details: measure A (ambient, lowest) / E (evac, highest) */
+let dbaMeasureTarget = null;   // "a" | "e" | null
+function dbaMeasureToggle(which) {
+  const btn = document.getElementById(which === "a" ? "mA" : "mE");
+  if (meterRunning() && dbaMeasureTarget === which) {
+    const val = which === "a" ? meterMinV : meterMaxV;
+    meterStop();
+    dbaMeasureTarget = null;
+    btn.textContent = "Measure";
+    document.getElementById("mLive").textContent = "";
+    if (val !== Infinity && val !== -Infinity) {
+      document.getElementById(which === "a" ? "dVa" : "dVe").value = val.toFixed(1);
+    }
+    return;
+  }
+  if (meterRunning()) return;   // other measurement in progress
+  dbaMeasureTarget = which;
+  btn.textContent = "Stop";
+  meterStart(db => {
+    document.getElementById("mLive").textContent = "🎤 " + fmtDb(db) + " dBA (" +
+      (which === "a" ? "lowest " + fmtDb(meterMinV) : "highest " + fmtDb(meterMaxV)) + ")";
+  }).catch(() => {
+    dbaMeasureTarget = null;
+    btn.textContent = "Measure";
+    alert("Couldn't access the microphone. Allow mic access for this app and try again.");
+  });
+}
 
 /* mark dirty on any undoable change */
 const _origPushUndo = pushUndo;
@@ -2637,7 +3030,18 @@ function openDetails() {
   detailsModal.classList.add("show");
 }
 document.getElementById("btnDetails").onclick = openDetails;
-document.getElementById("detailsCancel").onclick = () => { detailsModal.classList.remove("show"); detailsTargets = []; };
+document.getElementById("mA").onclick = () => dbaMeasureToggle("a");
+document.getElementById("mE").onclick = () => dbaMeasureToggle("e");
+function stopDbaMeasure() {
+  if (meterRunning() && dbaMeasureTarget) {
+    meterStop();
+    dbaMeasureTarget = null;
+    document.getElementById("mA").textContent = "Measure";
+    document.getElementById("mE").textContent = "Measure";
+    document.getElementById("mLive").textContent = "";
+  }
+}
+document.getElementById("detailsCancel").onclick = () => { stopDbaMeasure(); detailsModal.classList.remove("show"); detailsTargets = []; };
 
 document.getElementById("dPhotoAdd").onclick = () => document.getElementById("dPhotoInput").click();
 document.getElementById("dPhotoInput").addEventListener("change", e => {
@@ -2670,6 +3074,7 @@ document.getElementById("dPhotoRemove").onclick = () => {
 };
 
 document.getElementById("detailsSave").onclick = () => {
+  stopDbaMeasure();
   if (detailsTargets.length) {
     pushUndo();
     const multi = detailsTargets.length > 1;
@@ -2977,6 +3382,8 @@ window.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
   else if ((e.ctrlKey || e.metaKey) && (k === "y" || (k === "z" && e.shiftKey))) { e.preventDefault(); redo(); }
   else if ((e.ctrlKey || e.metaKey) && k === "d") { e.preventDefault(); btnDup.onclick(); }
+  else if ((e.ctrlKey || e.metaKey) && k === "c") { if (selection.length) { e.preventDefault(); copySelection(); } }
+  else if ((e.ctrlKey || e.metaKey) && k === "v") { if (clipboardObjs.length) { e.preventDefault(); pasteClipboard(); } }
   else if ((e.ctrlKey || e.metaKey) && k === "s") { e.preventDefault(); saveProject(); }
   else if (e.key === "Delete" || e.key === "Backspace") { if (selection.length) { e.preventDefault(); btnDel.onclick(); } }
   else if (e.key === "Escape") { clearSelection(); setTool("pan"); draw(); }
