@@ -84,29 +84,40 @@
   #exportPanel img { max-width:92%; max-height:58%; border:2px solid #555; border-radius:6px; background:#fff; }
   #exportPanel .row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
   #exportPanel .hint { font-size:12px; color:#aaa; text-align:center; max-width:440px; }
+  #bottombar { gap:6px; }
+  #bottombar .btn { padding:7px 8px; font-size:12.5px; }
+  #topbar { gap:5px; }
+  #topbar .btn { padding:7px 8px; font-size:12.5px; }
+  .modebtn.testmode { background:#173420; border-color:#2e7d32; min-width:66px; }
+  .modebtn.testmode span:first-child { color:#4caf50; }
+  .modebtn.testmode .lbl { color:#7ddb8f; font-weight:700; }
+  .modebtn.testmode.active { border-color:#4caf50; background:#1f5c2e; }
+  .btn.levels { background:#2b3a55; border-color:#48639c; }
+  #btnMulti.active { border-color:#ff5a3c; background:#3a2b27; }
+  #toolTip { position:fixed; display:none; z-index:99; background:#0d0f12; color:#fff; border:1px solid #556; border-radius:8px; padding:6px 10px; font-size:12.5px; max-width:250px; pointer-events:none; box-shadow:0 3px 12px rgba(0,0,0,.5); }
 </style>
 </head>
 <body>
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.18 beta</span></span>
-    <button class="btn" id="btnPlans">&#9776; Plans</button>
-    <button class="btn" id="btnNew">&#65291; New</button>
-    <button class="btn" id="btnOpenProj">&#128194; Open</button>
-    <button class="btn" id="btnPhoto">&#128247; Photo</button>
-    <button class="btn" id="btnSaveProj">&#128190; Save</button>
-    <select id="levelSel" style="display:none;background:#2e333a;color:#e8e8e8;border:1px solid #444;border-radius:8px;padding:7px"></select>
-    <button class="btn" id="btnLevels" title="Manage levels">&#127970;</button>
-    <button class="btn" id="btnFit">Fit all</button>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.19 beta</span></span>
+    <button class="btn" id="btnPlans" title="Plans saved on this device">&#9776; Plans</button>
+    <button class="btn" id="btnNew" title="Start a new plan">&#65291; New</button>
+    <button class="btn" id="btnOpenProj" title="Open a PDF plan or saved project">&#128194; Open</button>
+    <button class="btn" id="btnPhoto" title="Photo of the plan (camera on tablet/phone)">&#128247; Photo</button>
+    <button class="btn" id="btnSaveProj" title="Save project file">&#128190; Save</button>
+    <button class="btn" id="btnFit" title="Fit the whole plan on screen">Fit all</button>
     <button class="btn" id="btnPageSpace" title="Add white space below the plan">Page +</button>
     <button class="btn" id="btnPageMinus" title="Remove added white space">Page &minus;</button>
-    <button class="btn" id="btnLabels">&#127991; Labels</button>
-    <button class="btn" id="btnZones">Zones</button>
-    <button class="btn" id="btnNotes">&#128221; Notes</button>
+    <button class="btn" id="btnLabels" title="Show or hide symbol labels">&#127991; Labels</button>
+    <button class="btn" id="btnZones" title="Zones — manage and colour zones">Zones</button>
+    <button class="btn" id="btnNotes" title="Site notes">&#128221; Notes</button>
+    <select id="levelSel" style="display:none;background:#2e333a;color:#e8e8e8;border:1px solid #444;border-radius:8px;padding:7px"></select>
+    <button class="btn levels" id="btnLevels" title="Building levels — add or switch floors">&#127970; Levels</button>
     <span class="spacer"></span>
-    <button class="btn report" id="btnReport">&#128203; Report</button>
-    <button class="btn primary" id="btnExport">&#11015; Export</button>
+    <button class="btn report" id="btnReport" title="Test report">&#128203; Report</button>
+    <button class="btn primary" id="btnExport" title="Export PDF / image">&#11015; Export</button>
     <input type="file" id="fileInput" accept="image/*">
     <input type="file" id="projInput">
     <input type="file" id="imgObjInput" accept="image/*">
@@ -118,10 +129,9 @@
   <div id="sideTabs"></div>
   <div id="centerCol">
   <div id="toolrow">
-    <div class="modebtn active" id="mode-pan"><span>&#9995;</span><span class="lbl">Pan</span></div>
-    <div class="modebtn" id="mode-select"><span>&#10548;</span><span class="lbl">Select</span></div>
-    <div class="modebtn" id="mode-test"><span style="color:#4caf50">&#10003;</span><span class="lbl">Test</span></div>
-    <div class="modebtn" id="mode-multi" title="While on, taps add/remove from the selection (or hold Shift on PC)"><span>&#65291;</span><span class="lbl">Multi</span></div>
+    <div class="modebtn active" id="mode-pan" title="Pan — move around the plan"><span>&#9995;</span><span class="lbl">Pan</span></div>
+    <div class="modebtn" id="mode-select" title="Select objects"><span>&#10548;</span><span class="lbl">Select</span></div>
+    <div class="modebtn testmode" id="mode-test" title="Test mode — tap devices to mark them tested"><span>&#10003;</span><span class="lbl">Test mode</span></div>
     <button class="btn bigur" id="btnUndo" title="Undo (Ctrl+Z)">&#8630;</button>
     <button class="btn bigur" id="btnRedo" title="Redo (Ctrl+Y)">&#8631;</button>
   </div>
@@ -153,19 +163,21 @@
       </select>
     </div>
     <div id="alphaWrap" style="display:none;align-items:center;gap:5px;font-size:12px;color:#aaa">Opacity <input type="range" id="alphaSlider" min="10" max="100" value="40" style="width:80px"></div>
-    <button class="btn info" id="btnDetails" disabled>&#9432; Details</button>
+    <button class="btn info" id="btnDetails" disabled title="Zone / loop / device details">&#9432; Details</button>
     <button class="btn" id="btnRotate" disabled title="Rotate 90&deg;">&#10227;</button>
     <button class="btn" id="btnFlipH" disabled title="Flip horizontal">&#8644;</button>
     <button class="btn" id="btnFlipV" disabled title="Flip vertical">&#8645;</button>
     <button class="btn" id="btnHalf" disabled title="Halftone (fade)">&#9681;</button>
+    <button class="btn" id="btnMulti" title="Multi-select — while on, taps add or remove from the selection (or hold Shift on PC)">&#65291;</button>
     <button class="btn" id="btnSame" disabled title="Select all of this type">Select same</button>
-    <button class="btn" id="btnGroup" disabled>Group</button>
-    <button class="btn" id="btnUngroup" disabled>Ungroup</button>
+    <button class="btn" id="btnGroup" disabled title="Group the selection so it moves as one">Group</button>
+    <button class="btn" id="btnUngroup" disabled title="Ungroup">Ungroup</button>
+    <button class="btn" id="btnDup" disabled title="Duplicate selection (Ctrl+D)">Duplicate</button>
+    <button class="btn" id="btnFlatten" disabled title="Permanently burn selection into the plan">Flatten</button>
+    <button class="btn" id="btnCut" disabled title="Cut (Ctrl+X)">Cut</button>
     <button class="btn" id="btnCopy" disabled title="Copy (Ctrl+C)">Copy</button>
     <button class="btn" id="btnPaste" disabled title="Paste (Ctrl+V)">Paste</button>
-    <button class="btn" id="btnDup" disabled>Duplicate</button>
-    <button class="btn danger" id="btnDel" disabled>&#128465; Delete</button>
-    <button class="btn" id="btnFlatten" disabled title="Permanently burn selection into the plan">Flatten</button>
+    <button class="btn danger" id="btnDel" disabled title="Delete selection">&#128465; Delete</button>
     <span class="spacer"></span>
     <span id="status">No plan loaded</span>
   </div>
@@ -185,6 +197,15 @@
       <label>E = (dBA, evac — highest reading)</label>
       <div style="display:flex;gap:6px"><input type="text" id="dVe" autocomplete="off" style="flex:1"><button class="btn" id="mE" type="button">Measure</button></div>
       <div id="mLive" style="font-size:13px;color:#4caf50;min-height:18px;margin-top:6px"></div>
+    </div>
+    <div id="bgcWrap" style="display:none">
+      <label>Colour</label>
+      <div style="display:flex;gap:13px;font-size:14px;color:#e8e8e8;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" class="dBgc" value="#d81e05" style="width:17px;height:17px">Red</label>
+        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" class="dBgc" value="#1b8a3f" style="width:17px;height:17px">Green</label>
+        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" class="dBgc" value="#ffffff" style="width:17px;height:17px">White</label>
+        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" class="dBgc" value="#111111" style="width:17px;height:17px">Black</label>
+      </div>
     </div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;color:#e8e8e8">
       <input type="checkbox" id="dFailed" style="width:18px;height:18px"> Failed
@@ -289,11 +310,12 @@
   <div class="modalbox" style="max-width:380px;text-align:center">
     <h3>Timer</h3>
     <div id="timerLive" style="font-size:46px;font-weight:800;margin:6px 0">--:--</div>
+    <label style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:#aaa;margin:2px 0 6px"><input type="checkbox" id="timerBadgeOn" checked style="width:17px;height:17px"> Show mini timer on screen</label>
     <div id="timerIdle">
       <label style="text-align:left">Countdown minutes (emergency light test = 90)</label>
       <input type="text" id="timerMins" inputmode="numeric" value="90" style="width:100%;background:#1a1d21;border:1px solid #444;border-radius:6px;color:#e8e8e8;padding:8px;font-size:16px;text-align:center">
       <div class="row" style="justify-content:center">
-        <button class="btn primary" id="timerStartDown">&#9200; Start countdown</button>
+        <button class="btn" id="timerStartDown" style="background:#1b8a3f;border-color:#2fae57;color:#fff;font-weight:800;font-size:15px;padding:10px 18px;border-radius:10px">&#9654; Start countdown</button>
         <button class="btn" id="timerStartUp">&#9201; Stopwatch</button>
       </div>
     </div>
@@ -392,6 +414,7 @@ const TYPES = [
   { id:"exitl",    tab:"exit", label:"Exit Left",    glyph:"exit",     text:"EXIT",  arrow:"l", color:"#1b8a3f" },
   { id:"exit",     tab:"exit", label:"Exit",         glyph:"exit",     text:"EXIT",  arrow:"",  color:"#1b8a3f" },
   { id:"exitr",    tab:"exit", label:"Exit Right",   glyph:"exit",     text:"EXIT",  arrow:"r", color:"#1b8a3f" },
+  { id:"bglass",   tab:"exit", label:"Break Glass",  glyph:"bglass",   text:"",      color:"#1b8a3f" },
   { id:"db",       tab:"elec", label:"DB Board",     glyph:"db",       text:"",      color:"#111111" },
   { id:"door",     tab:"bldg", label:"Door",         glyph:"door",     text:"",      color:"#111111" },
   { id:"dbldoor",  tab:"bldg", label:"Double Door",  glyph:"dbldoor",  text:"",      color:"#111111" },
@@ -426,6 +449,7 @@ const MARKUP_TOOLS = [
   { id:"hatchs",  label:"Hatch solid", icon:"■" },
   { id:"hatcho",  label:"Hatch dots",  icon:"⣿" }
 ];
+const VESDAR_TOOL = { id:"vesdar", label:"VESDA run", icon:'<span style="color:#b06fd0">&#9645;</span>' };
 const TABS = [
   { id:"fav",    label:"Favourites" },
   { id:"fire",   label:"Fire" },
@@ -572,25 +596,68 @@ function drawSym(c, o, scale) {
     if (c.roundRect) c.roundRect(-w / 2, -h / 2, w, h, s * 0.12); else c.rect(-w / 2, -h / 2, w, h);
     c.fill(); c.stroke();
     const ah = h * 0.5;
-    let ox = 0;
+    const runner = (cx2, hh) => {
+      const u = hh / 10;
+      c.save();
+      c.translate(cx2, 0);
+      c.strokeStyle = "#ffffff"; c.fillStyle = "#ffffff";
+      c.lineWidth = u * 1.15; c.lineCap = "round"; c.lineJoin = "round";
+      c.beginPath(); c.arc(u * 1.1, -u * 3.4, u * 1.1, 0, Math.PI * 2); c.fill();
+      c.beginPath();
+      c.moveTo(u * 0.7, -u * 2.0); c.lineTo(-u * 0.5, u * 0.6);
+      c.moveTo(u * 0.5, -u * 1.5); c.lineTo(u * 2.5, -u * 0.3);
+      c.moveTo(u * 0.2, -u * 1.2); c.lineTo(-u * 1.9, -u * 2.2);
+      c.moveTo(-u * 0.5, u * 0.6); c.lineTo(u * 1.7, u * 1.5); c.lineTo(u * 2.1, u * 3.6);
+      c.moveTo(-u * 0.5, u * 0.6); c.lineTo(-u * 2.1, u * 1.9); c.lineTo(-u * 3.4, u * 1.3);
+      c.stroke();
+      c.restore();
+    };
     if (t.arrow === "l") {
       c.fillStyle = "#ffffff";
       c.beginPath();
-      c.moveTo(-w / 2 + h * 0.16, 0);
-      c.lineTo(-w / 2 + h * 0.16 + ah * 0.9, -ah / 2);
-      c.lineTo(-w / 2 + h * 0.16 + ah * 0.9, ah / 2);
+      c.moveTo(-w / 2 + h * 0.14, 0);
+      c.lineTo(-w / 2 + h * 0.14 + ah * 0.8, -ah / 2);
+      c.lineTo(-w / 2 + h * 0.14 + ah * 0.8, ah / 2);
       c.closePath(); c.fill();
-      ox = ah * 0.45;
+      runner(-w / 2 + h * 0.98, h * 0.66);
+      glyphText("EXIT", s * 0.38, s * 0.56, 0);
     } else if (t.arrow === "r") {
       c.fillStyle = "#ffffff";
       c.beginPath();
-      c.moveTo(w / 2 - h * 0.16, 0);
-      c.lineTo(w / 2 - h * 0.16 - ah * 0.9, -ah / 2);
-      c.lineTo(w / 2 - h * 0.16 - ah * 0.9, ah / 2);
+      c.moveTo(w / 2 - h * 0.14, 0);
+      c.lineTo(w / 2 - h * 0.14 - ah * 0.8, -ah / 2);
+      c.lineTo(w / 2 - h * 0.14 - ah * 0.8, ah / 2);
       c.closePath(); c.fill();
-      ox = -ah * 0.45;
+      runner(-w / 2 + h * 0.5, h * 0.66);
+      glyphText("EXIT", s * 0.38, -s * 0.1, 0);
+    } else {
+      runner(-w / 2 + h * 0.52, h * 0.72);
+      glyphText("EXIT", s * 0.46, s * 0.3, 0);
     }
-    glyphText("EXIT", s * 0.48, ox, 0);
+  } else if (t.glyph === "bglass") {
+    const r = s / 2;
+    const lower = (col || "").toLowerCase();
+    const isW = lower === "#ffffff" || lower === "#fff";
+    const isB = lower === "#111111" || lower === "#000000" || lower === "#000";
+    c.fillStyle = col; c.strokeStyle = isW ? "#444444" : "#ffffff";
+    c.lineWidth = Math.max(1, s * 0.055);
+    c.beginPath();
+    if (c.roundRect) c.roundRect(-r, -r, s, s, s * 0.1); else c.rect(-r, -r, s, s);
+    c.fill(); c.stroke();
+    const ww = s * 0.68, wh = s * 0.4, wy = s * 0.08;
+    c.fillStyle = isB ? "#ffffff" : "#111111";
+    c.fillRect(-ww / 2, wy - wh / 2, ww, wh);
+    const acc = isB ? "#111111" : "#ffffff";
+    c.fillStyle = acc;
+    c.beginPath(); c.arc(0, wy, s * 0.085, 0, Math.PI * 2); c.fill();
+    c.beginPath();
+    c.moveTo(-s * 0.13, wy); c.lineTo(-ww * 0.46, wy - s * 0.05); c.lineTo(-ww * 0.46, wy + s * 0.05);
+    c.closePath(); c.fill();
+    c.beginPath();
+    c.moveTo(s * 0.13, wy); c.lineTo(ww * 0.46, wy - s * 0.05); c.lineTo(ww * 0.46, wy + s * 0.05);
+    c.closePath(); c.fill();
+    c.fillStyle = isW ? "#333333" : "#ffffff";
+    c.fillRect(-ww / 2, -s * 0.36, ww, Math.max(1, s * 0.045));
   } else if (t.glyph === "horn") {
     const w = s * 1.7, h = s;
     const sq = h * 0.55;
@@ -639,17 +706,17 @@ function drawSym(c, o, scale) {
     c.fillStyle = col; c.strokeStyle = "#ffffff";
     c.lineWidth = Math.max(1, r * 0.12);
     c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill(); c.stroke();
-    c.strokeStyle = "#111111"; c.lineWidth = Math.max(1.2, r * 0.11);
+    c.fillStyle = "#111111";
     c.lineJoin = "round";
     c.beginPath();
-    c.moveTo(r * 0.16, -r * 0.62);
-    c.lineTo(-r * 0.3, r * 0.05);
-    c.lineTo(-r * 0.02, r * 0.05);
-    c.lineTo(-r * 0.16, r * 0.45);
-    c.lineTo(r * 0.3, -r * 0.2);
-    c.lineTo(r * 0.02, -r * 0.2);
+    c.moveTo(r * 0.18, -r * 0.66);
+    c.lineTo(-r * 0.34, r * 0.05);
+    c.lineTo(-r * 0.04, r * 0.05);
+    c.lineTo(-r * 0.18, r * 0.5);
+    c.lineTo(r * 0.34, -r * 0.18);
+    c.lineTo(r * 0.04, -r * 0.18);
     c.closePath();
-    c.stroke();
+    c.fill();
     c.save();
     c.scale(sx, sy);
     c.fillStyle = "#111111";
@@ -1039,6 +1106,27 @@ function drawObjectInner(c, o, scale) {
       c.restore();
     } else if (o.shape === "rect") {
       c.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+    } else if (o.shape === "vesdar") {
+      const rx = Math.min(x1, x2), ry = Math.min(y1, y2), rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
+      c.save();
+      c.setLineDash([7 * scale, 5 * scale]);
+      c.strokeRect(rx, ry, rw, rh);
+      c.setLineDash([]);
+      c.beginPath();
+      if (rw >= rh) { c.moveTo(rx, ry + rh / 2); c.lineTo(rx + rw, ry + rh / 2); }
+      else { c.moveTo(rx + rw / 2, ry); c.lineTo(rx + rw / 2, ry + rh); }
+      c.stroke();
+      const fs = Math.max(9 * scale, Math.min(rh * 0.55, rw / 4.5));
+      if (rw > fs * 3 && rh > fs) {
+        c.font = "bold " + fs + "px system-ui, sans-serif";
+        c.textAlign = "center"; c.textBaseline = "middle";
+        const tw = c.measureText("VESDA").width;
+        c.globalAlpha = 0.88; c.fillStyle = "#ffffff";
+        c.fillRect(rx + rw / 2 - tw / 2 - fs * 0.25, ry + rh / 2 - fs * 0.62, tw + fs * 0.5, fs * 1.24);
+        c.globalAlpha = 1; c.fillStyle = o.color;
+        c.fillText("VESDA", rx + rw / 2, ry + rh / 2);
+      }
+      c.restore();
     } else if (o.shape === "ellipse") {
       c.beginPath();
       c.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.abs(x2 - x1) / 2, Math.abs(y2 - y1) / 2, 0, 0, Math.PI * 2);
@@ -1451,6 +1539,7 @@ function updateSelButtons() {
   document.getElementById("btnUngroup").disabled = !selection.some(o => o.grp);
   document.getElementById("btnFlatten").disabled = !any;
   document.getElementById("btnCopy").disabled = !any;
+  document.getElementById("btnCut").disabled = !any;
   document.getElementById("btnPaste").disabled = !clipboardObjs.length || !img;
   const styleTargets = selection.filter(o => (o.kind === "shape" && (o.shape === "line" || o.shape === "arrow" || o.shape === "rect" || o.shape === "ellipse")));
   const swp = document.getElementById("styleWrap");
@@ -1676,7 +1765,7 @@ function drawPalIcon(canvasEl, typeId) {
     size: bigGlyphs.includes(t.glyph) ? 14 : (t.glyph === "door" || t.glyph === "lstair" || t.glyph === "dba") ? 18 : 26 }, 1);
 }
 
-const TAB_ICONS = { fav:"★", fire:"🔥", exit:"🚶", elec:"⚡", bldg:"🏗", markup:"✏️", tools:"🧰" };
+const TAB_ICONS = { fav:"★", fire:"🔥", exit:"🏃", elec:"⚡", bldg:"🚪", markup:"✏️", tools:"🧰" };
 function buildTabs() {
   tabsEl.innerHTML = "";
   TABS.forEach(tb => {
@@ -1803,7 +1892,7 @@ function entriesForTab(tab) {
   if (tab === "fav") {
     return favIds.map(id => {
       if (TYPE_MAP[id]) return { kind:"sym", t:TYPE_MAP[id] };
-      const m = MARKUP_TOOLS.find(mt => mt.id === id) || TOOLS_TAB.find(mt => mt.id === id);
+      const m = MARKUP_TOOLS.find(mt => mt.id === id) || TOOLS_TAB.find(mt => mt.id === id) || (id === "vesdar" ? VESDAR_TOOL : null);
       return m ? { kind:"tool", t:m } : null;
     }).filter(Boolean);
   }
@@ -1813,7 +1902,9 @@ function entriesForTab(tab) {
   }
   if (tab === "tools") return TOOLS_TAB.map(t => ({ kind:"tool", t }));
   const ids = applyOrder(TYPES.filter(t => t.tab === tab).map(t => t.id), tab);
-  return ids.map(id => ({ kind:"sym", t:TYPE_MAP[id] })).filter(e => e.t);
+  const out = ids.map(id => ({ kind:"sym", t:TYPE_MAP[id] })).filter(e => e.t);
+  if (tab === "fire") out.push({ kind:"tool", t:VESDAR_TOOL });
+  return out;
 }
 
 function buildPalette() {
@@ -1880,9 +1971,9 @@ document.getElementById("mode-pan").onclick = () => setTool("pan");
 document.getElementById("mode-select").onclick = () => setTool("select");
 document.getElementById("mode-test").onclick = () => setTool("test");
 let multiMode = false;
-document.getElementById("mode-multi").onclick = () => {
+document.getElementById("btnMulti").onclick = () => {
   multiMode = !multiMode;
-  document.getElementById("mode-multi").classList.toggle("active", multiMode);
+  document.getElementById("btnMulti").classList.toggle("active", multiMode);
   if (multiMode && activeTool !== "select") setTool("select");
 };
 document.getElementById("testYear").addEventListener("change", e => { testYearSel = +e.target.value; requestDraw(); });
@@ -2616,7 +2707,7 @@ function timerBegin(down, minutes) {
     timerStartedAt = Date.now();
     timerEndsAt = null;
   }
-  document.getElementById("timerBadge").style.display = "block";
+  document.getElementById("timerBadge").style.display = document.getElementById("timerBadgeOn").checked ? "block" : "none";
   document.getElementById("timerStop").style.display = "inline-block";
   document.getElementById("timerIdle").style.display = "none";
   timerInterval = setInterval(timerTick, 500);
@@ -2642,12 +2733,18 @@ document.getElementById("timerStartUp").onclick = () => timerBegin(false);
 document.getElementById("timerStop").onclick = () => timerHalt();
 document.getElementById("timerClose").onclick = () => document.getElementById("timerModal").classList.remove("show");
 document.getElementById("timerBadge").onclick = openTimer;
+const tbOn = document.getElementById("timerBadgeOn");
+try { if (localStorage.getItem("bpm-timer-badge") === "0") tbOn.checked = false; } catch (e) {}
+tbOn.onchange = () => {
+  try { localStorage.setItem("bpm-timer-badge", tbOn.checked ? "1" : "0"); } catch (e) {}
+  if (timerInterval) document.getElementById("timerBadge").style.display = tbOn.checked ? "block" : "none";
+};
 // resume countdown after reload
 try {
   const saved = parseInt(localStorage.getItem("bpm-timer"), 10);
   if (saved && saved > Date.now()) {
     timerEndsAt = saved;
-    document.getElementById("timerBadge").style.display = "block";
+    document.getElementById("timerBadge").style.display = document.getElementById("timerBadgeOn").checked ? "block" : "none";
     document.getElementById("timerStop").style.display = "inline-block";
     document.getElementById("timerIdle").style.display = "none";
     timerInterval = setInterval(timerTick, 500);
@@ -2749,6 +2846,7 @@ function pasteClipboard() {
 }
 document.getElementById("btnCopy").onclick = copySelection;
 document.getElementById("btnPaste").onclick = pasteClipboard;
+document.getElementById("btnCut").onclick = () => { if (!selection.length) return; copySelection(); btnDel.onclick(); };
 
 /* ================= Site photos ================= */
 document.getElementById("cameraInput").addEventListener("change", e => {
@@ -2951,7 +3049,7 @@ function localXY(e) {
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 
-const SHAPE_TOOLS = ["line", "arrow", "rect", "ellipse", "cloud", "callout", "hatchd", "hatchx", "hatchs", "hatcho"];
+const SHAPE_TOOLS = ["line", "arrow", "rect", "ellipse", "cloud", "callout", "hatchd", "hatchx", "hatchs", "hatcho", "vesdar"];
 const HATCH_PATTERN = { hatchd:"diag", hatchx:"cross", hatchs:"solid", hatcho:"dots" };
 
 cv.addEventListener("pointerdown", e => {
@@ -3154,6 +3252,7 @@ cv.addEventListener("pointermove", e => {
         color:penColor, width:base.width, alpha:0.4 };
     } else {
       tempShape = { kind:"shape", shape:activeTool, x1:shapeStart.x, y1:shapeStart.y, x2:ip.x, y2:ip.y, color:penColor, width:base.width, ls:lineStyle };
+      if (activeTool === "vesdar") { tempShape.color = "#7b1fa2"; tempShape.width = Math.max(2.5, base.width); tempShape.ls = "solid"; }
     }
     requestDraw();
     return;
@@ -3364,6 +3463,14 @@ function openDetails() {
     el.placeholder = multi ? "(leave blank to keep)" : "";
   });
   document.getElementById("dbaFields").style.display = syms.some(o => o.type === "dba") ? "block" : "none";
+  const bgTargets = syms.filter(o => o.type === "bglass");
+  document.getElementById("bgcWrap").style.display = bgTargets.length ? "block" : "none";
+  if (bgTargets.length) {
+    document.querySelectorAll(".dBgc").forEach(cb => {
+      cb.checked = bgTargets.every(o => (o.color || "#1b8a3f") === cb.value);
+      cb.onchange = () => { if (cb.checked) document.querySelectorAll(".dBgc").forEach(x => { if (x !== cb) x.checked = false; }); };
+    });
+  }
   const fEl = document.getElementById("dFailed");
   fEl.checked = syms.every(o => o.failed);
   fEl.indeterminate = multi && syms.some(o => o.failed) && !syms.every(o => o.failed);
@@ -3450,6 +3557,10 @@ document.getElementById("detailsSave").onclick = () => {
       Object.entries(vals).forEach(([k, v]) => {
         if (!multi || v !== "") o[k] = v;
       });
+      if (o.type === "bglass") {
+        const bgSel = [...document.querySelectorAll(".dBgc")].find(cb => cb.checked);
+        if (bgSel) o.color = bgSel.value;
+      }
       if (!multi || failedTouched) o.failed = failed;
       document.querySelectorAll(".dYear").forEach(cb => {
         const y = +cb.value;
@@ -3745,6 +3856,62 @@ document.getElementById("btnFit").onclick = fitView;
 document.getElementById("btnUndo").onclick = undo;
 document.getElementById("btnRedo").onclick = redo;
 
+/* ---- tool tips: hover on PC, press & hold on tablet/phone ---- */
+(function () {
+  const tip = document.createElement("div");
+  tip.id = "toolTip";
+  document.body.appendChild(tip);
+  let hoverT = null, pressT = null, suppress = null;
+  function showTip(el) {
+    const txt = el.dataset.tip;
+    if (!txt) return;
+    tip.textContent = txt;
+    tip.style.display = "block";
+    tip.style.left = "0px"; tip.style.top = "0px";
+    const r = el.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = r.left + r.width / 2 - tw / 2;
+    x = Math.max(6, Math.min(window.innerWidth - tw - 6, x));
+    let y = r.top - th - 8;
+    if (y < 6) y = r.bottom + 8;
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  }
+  function hideTip() { tip.style.display = "none"; }
+  document.querySelectorAll("button.btn[title], .modebtn[title]").forEach(el => {
+    el.dataset.tip = el.getAttribute("title");
+    el.removeAttribute("title");
+  });
+  document.addEventListener("pointerover", e => {
+    if (e.pointerType !== "mouse") return;
+    const el = e.target.closest && e.target.closest("[data-tip]");
+    clearTimeout(hoverT);
+    if (!el) { hideTip(); return; }
+    hoverT = setTimeout(() => showTip(el), 420);
+  });
+  document.addEventListener("pointerout", e => {
+    if (e.pointerType === "mouse") { clearTimeout(hoverT); hideTip(); }
+  });
+  document.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse") return;
+    const el = e.target.closest && e.target.closest("[data-tip]");
+    if (!el) return;
+    clearTimeout(pressT);
+    pressT = setTimeout(() => {
+      suppress = el;
+      showTip(el);
+      if (navigator.vibrate) navigator.vibrate(10);
+    }, 550);
+  }, true);
+  function endPress() { clearTimeout(pressT); setTimeout(hideTip, 1300); }
+  document.addEventListener("pointerup", endPress, true);
+  document.addEventListener("pointercancel", endPress, true);
+  document.addEventListener("click", e => {
+    if (suppress && e.target.closest && e.target.closest("[data-tip]") === suppress) {
+      e.stopPropagation(); e.preventDefault(); suppress = null;
+    } else suppress = null;
+  }, true);
+})();
+
 window.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
   const k = e.key.toLowerCase();
@@ -3752,6 +3919,7 @@ window.addEventListener("keydown", e => {
   else if ((e.ctrlKey || e.metaKey) && (k === "y" || (k === "z" && e.shiftKey))) { e.preventDefault(); redo(); }
   else if ((e.ctrlKey || e.metaKey) && k === "d") { e.preventDefault(); btnDup.onclick(); }
   else if ((e.ctrlKey || e.metaKey) && k === "c") { if (selection.length) { e.preventDefault(); copySelection(); } }
+  else if ((e.ctrlKey || e.metaKey) && k === "x") { if (selection.length) { e.preventDefault(); copySelection(); btnDel.onclick(); } }
   else if ((e.ctrlKey || e.metaKey) && k === "v") { if (clipboardObjs.length) { e.preventDefault(); pasteClipboard(); } }
   else if ((e.ctrlKey || e.metaKey) && k === "s") { e.preventDefault(); saveProject(); }
   else if (e.key === "Delete" || e.key === "Backspace") { if (selection.length) { e.preventDefault(); btnDel.onclick(); } }
