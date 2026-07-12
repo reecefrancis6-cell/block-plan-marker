@@ -134,7 +134,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.24 beta</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.25 beta</span></span>
     <button class="btn" id="btnPlans" title="Plans saved on this device">&#9776; Plans</button>
     <button class="btn" id="btnNew" title="Start a new plan">&#65291; New</button>
     <button class="btn" id="btnOpenProj" title="Open a PDF plan or saved project">&#128194; Open</button>
@@ -375,7 +375,7 @@
       <input type="text" id="timerMins" inputmode="numeric" value="90" style="width:100%;background:#1a1d21;border:1px solid #444;border-radius:6px;color:#e8e8e8;padding:8px;font-size:16px;text-align:center">
       <div class="row" style="justify-content:center">
         <button class="btn" id="timerStartDown" style="background:#1b8a3f;border:2px solid #ffffff;outline:1px solid #1b8a3f;color:#fff;font-weight:800;font-size:14px;letter-spacing:.4px;padding:11px 16px;border-radius:8px;display:inline-flex;align-items:center;gap:9px">
-        <svg width="15" height="17" viewBox="0 0 10 12" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="1.6" r="1.25" fill="#fff" stroke="none"/><path d="M5.6 3.4 L4.4 6.4 M5.4 4.2 L7.6 5.2 M5 3.9 L3 3 M4.4 6.4 L6.2 7.8 L6.6 10.6 M4.4 6.4 L2.6 8 L1 7.4"/></svg>
+        <svg width="26" height="30" viewBox="0 0 10 12" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="1.6" r="1.25" fill="#fff" stroke="none"/><path d="M5.6 3.4 L4.4 6.4 M5.4 4.2 L7.6 5.2 M5 3.9 L3 3 M4.4 6.4 L6.2 7.8 L6.6 10.6 M4.4 6.4 L2.6 8 L1 7.4"/></svg>
         START EMERGENCY COUNTDOWN</button>
         <button class="btn" id="timerStartUp">&#9201; Stopwatch</button>
       </div>
@@ -1041,26 +1041,23 @@ function drawSym(c, o, scale) {
         c.fillStyle = "#e0e0e0"; c.fill();
         c.strokeStyle = "#ffffff"; c.lineWidth = Math.max(1, br2 * 0.16); c.stroke();
       }
-    } else if (done) {
-      c.beginPath(); c.arc(bx2, by2, br2, 0, Math.PI * 2);
-      c.fillStyle = "#1b8a3f"; c.fill();
-      c.strokeStyle = "#ffffff"; c.lineWidth = Math.max(1, br2 * 0.16); c.stroke();
-      c.strokeStyle = "#ffffff"; c.lineWidth = br2 * 0.3; c.lineCap = "round";
-      c.beginPath();
-      c.moveTo(bx2 - br2 * 0.45, by2 + br2 * 0.05);
-      c.lineTo(bx2 - br2 * 0.1, by2 + br2 * 0.42);
-      c.lineTo(bx2 + br2 * 0.5, by2 - br2 * 0.35);
-      c.stroke();
     } else {
+      // circle: grey, or green + tick when tested this year
+      c.beginPath(); c.arc(bx2, by2, br2, 0, Math.PI * 2);
+      c.fillStyle = done ? "#1b8a3f" : "#e0e0e0"; c.fill();
+      c.strokeStyle = "#ffffff"; c.lineWidth = Math.max(1, br2 * 0.16); c.stroke();
+      if (done) {
+        c.strokeStyle = "#ffffff"; c.lineWidth = br2 * 0.3; c.lineCap = "round";
+        c.beginPath();
+        c.moveTo(bx2 - br2 * 0.45, by2 + br2 * 0.05);
+        c.lineTo(bx2 - br2 * 0.1, by2 + br2 * 0.42);
+        c.lineTo(bx2 + br2 * 0.5, by2 - br2 * 0.35);
+        c.stroke();
+      }
+      // last-year tag sits BESIDE the circle and never disappears
       let prevY = null;
       if (testPrevOn) (o.ty || []).forEach(yy => { if (yy < testYearSel && (prevY == null || yy > prevY)) prevY = yy; });
-      if (prevY != null) {
-        drawYearChip(c, bx2, by2, br2, String(prevY).slice(-2), "#1565c0");
-      } else {
-        c.beginPath(); c.arc(bx2, by2, br2, 0, Math.PI * 2);
-        c.fillStyle = "#e0e0e0"; c.fill();
-        c.strokeStyle = "#ffffff"; c.lineWidth = Math.max(1, br2 * 0.16); c.stroke();
-      }
+      if (prevY != null) drawYearChip(c, bx2 + br2 * 2.6, by2, br2 * 0.92, String(prevY).slice(-2), "#1565c0");
     }
     c.restore();
   }
@@ -1601,11 +1598,13 @@ function getHandles(o) {
       o.w = Math.max(o.size * 2, nx - o.x);
     }});
   } else if (o.kind === "img") {
+    // corner drags keep the image's aspect ratio (no accidental stretching)
+    const ratio = () => (o.h > 0 ? o.w / o.h : 1);
     const corners = [
-      { gx:() => o.x, gy:() => o.y, set:(nx, ny) => { const r = o.x + o.w, b2 = o.y + o.h; o.x = Math.min(nx, r - 15); o.y = Math.min(ny, b2 - 15); o.w = r - o.x; o.h = b2 - o.y; } },
-      { gx:() => o.x + o.w, gy:() => o.y, set:(nx, ny) => { const b2 = o.y + o.h; o.w = Math.max(15, nx - o.x); o.y = Math.min(ny, b2 - 15); o.h = b2 - o.y; } },
-      { gx:() => o.x, gy:() => o.y + o.h, set:(nx, ny) => { const r = o.x + o.w; o.x = Math.min(nx, r - 15); o.w = r - o.x; o.h = Math.max(15, ny - o.y); } },
-      { gx:() => o.x + o.w, gy:() => o.y + o.h, set:(nx, ny) => { o.w = Math.max(15, nx - o.x); o.h = Math.max(15, ny - o.y); } }
+      { gx:() => o.x, gy:() => o.y, set:(nx, ny) => { const r = o.x + o.w, b2 = o.y + o.h, rt = ratio(); const w = Math.max(15, r - nx), h = w / rt; o.x = r - w; o.y = b2 - h; o.w = w; o.h = h; } },
+      { gx:() => o.x + o.w, gy:() => o.y, set:(nx, ny) => { const b2 = o.y + o.h, rt = ratio(); const w = Math.max(15, nx - o.x), h = w / rt; o.y = b2 - h; o.w = w; o.h = h; } },
+      { gx:() => o.x, gy:() => o.y + o.h, set:(nx, ny) => { const r = o.x + o.w, rt = ratio(); const w = Math.max(15, r - nx), h = w / rt; o.x = r - w; o.w = w; o.h = h; } },
+      { gx:() => o.x + o.w, gy:() => o.y + o.h, set:(nx, ny) => { const rt = ratio(); const w = Math.max(15, nx - o.x), h = w / rt; o.w = w; o.h = h; } }
     ];
     corners.forEach(c2 => H.push({ x:c2.gx(), y:c2.gy(), set:c2.set }));
   } else if (o.kind === "callout") {
@@ -3709,6 +3708,24 @@ function localXY(e) {
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 
+// Shift = dead straight: snap a point to the nearest 45° about an anchor
+function snap45(ax, ay, px, py) {
+  const dx = px - ax, dy = py - ay;
+  const d = Math.hypot(dx, dy);
+  if (!d) return { x:px, y:py };
+  const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+  return { x:ax + d * Math.cos(a), y:ay + d * Math.sin(a) };
+}
+let handleAnchor = null;   // other endpoint while dragging a line/arrow handle
+function setHandleAnchor(hd) {
+  handleAnchor = null;
+  const so = selection[0];
+  if (so && so.kind === "shape" && (so.shape === "line" || so.shape === "arrow") && !hd.edge) {
+    handleAnchor = (Math.hypot(hd.x - so.x1, hd.y - so.y1) < Math.hypot(hd.x - so.x2, hd.y - so.y2))
+      ? { x:so.x2, y:so.y2 } : { x:so.x1, y:so.y1 };
+  }
+}
+
 const SHAPE_TOOLS = ["line", "arrow", "rect", "ellipse", "cloud", "callout", "hatch", "vesdar"];
 
 cv.addEventListener("pointerdown", e => {
@@ -3798,6 +3815,7 @@ cv.addEventListener("pointerdown", e => {
           pushUndo();
           dragMode = "handle";
           activeHandle = hd;
+          setHandleAnchor(hd);
           return;
         }
       }
@@ -3840,6 +3858,7 @@ cv.addEventListener("pointerdown", e => {
           pushUndo();
           dragMode = "handle";
           activeHandle = hd;
+          setHandleAnchor(hd);
           return;
         }
       }
@@ -3908,7 +3927,8 @@ cv.addEventListener("pointermove", e => {
   const ip = toImage(p.x, p.y);
 
   if (dragMode === "handle" && activeHandle) {
-    activeHandle.set(ip.x, ip.y);
+    const hp = (e.shiftKey && handleAnchor) ? snap45(handleAnchor.x, handleAnchor.y, ip.x, ip.y) : ip;
+    activeHandle.set(hp.x, hp.y);
     requestDraw();
     return;
   }
@@ -3945,7 +3965,9 @@ cv.addEventListener("pointermove", e => {
         pts: [{ x:shapeStart.x, y:shapeStart.y }, { x:ip.x, y:shapeStart.y }, { x:ip.x, y:ip.y }, { x:shapeStart.x, y:ip.y }],
         color:penColor, width:base.width, alpha:0.4 };
     } else {
-      tempShape = { kind:"shape", shape:activeTool, x1:shapeStart.x, y1:shapeStart.y, x2:ip.x, y2:ip.y, color:penColor, width:base.width, ls:lineStyle };
+      let ep = ip;
+      if (e.shiftKey && (activeTool === "line" || activeTool === "arrow")) ep = snap45(shapeStart.x, shapeStart.y, ip.x, ip.y);
+      tempShape = { kind:"shape", shape:activeTool, x1:shapeStart.x, y1:shapeStart.y, x2:ep.x, y2:ep.y, color:penColor, width:base.width, ls:lineStyle };
       if (activeTool === "line" || activeTool === "arrow") { tempShape.hs = lineEnds[activeTool].hs; tempShape.he = lineEnds[activeTool].he; }
       if (activeTool === "vesdar") { tempShape.color = "#7b1fa2"; tempShape.width = Math.max(2.5, base.width); tempShape.ls = "solid"; }
     }
@@ -4753,9 +4775,10 @@ function renderExportCanvas() {
   const zoneKeys = Object.keys(zones).filter(z => z !== "(no zone)").sort((a, b) => a.localeCompare(b, undefined, { numeric:true }));
   if (!used.length) return out;
 
+  const testExport = activeTool === "test";   // test-mode export: badge key only, no counts/zones
   const lh = Math.max(34, Math.round(out.width * 0.028));
-  const zoneRowH = zoneKeys.length ? Math.round(lh * 0.72) : 0;
-  const extra = lh + 8 + zoneRowH * zoneKeys.length + (zoneKeys.length ? 8 : 0);
+  const zoneRowH = (zoneKeys.length && !testExport) ? Math.round(lh * 0.72) : 0;
+  const extra = lh + 8 + (testExport ? 0 : zoneRowH * zoneKeys.length + (zoneKeys.length ? 8 : 0));
   const strip = document.createElement("canvas");
   strip.width = out.width; strip.height = out.height + extra;
   const sc = strip.getContext("2d");
@@ -4765,7 +4788,7 @@ function renderExportCanvas() {
 
   let x = lh * 0.7;
   const cy = out.height + 4 + lh / 2;
-  used.forEach(t => {
+  if (!testExport) used.forEach(t => {
     const n = objects.filter(o => o.kind === "sym" && o.type === t.id).length;
     const iconSize = lh * 0.55;
     const saveLabels = labelsOn; labelsOn = false;
@@ -4803,7 +4826,7 @@ function renderExportCanvas() {
     }
   }
 
-  zoneKeys.forEach((z, i) => {
+  if (!testExport) zoneKeys.forEach((z, i) => {
     const zy = out.height + 4 + lh + 8 + zoneRowH * i + zoneRowH / 2;
     const parts = Object.entries(zones[z]).map(([ty, n]) => (TYPE_MAP[ty] ? TYPE_MAP[ty].label : ty) + " × " + n);
     const total = Object.values(zones[z]).reduce((a, b) => a + b, 0);
