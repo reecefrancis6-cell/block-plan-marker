@@ -134,7 +134,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.26 beta</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.27 beta</span></span>
     <button class="btn" id="btnPlans" title="Plans saved on this device">&#9776; Plans</button>
     <button class="btn" id="btnNew" title="Start a new plan">&#65291; New</button>
     <button class="btn" id="btnOpenProj" title="Open a PDF plan or saved project">&#128194; Open</button>
@@ -221,6 +221,10 @@
       <select id="hatchStyleSel" style="background:#1a1d21;color:#e8e8e8;border:1px solid #444;border-radius:6px;padding:6px">
         <option value="diag">&#9698; Diagonal</option><option value="cross">&#9707; Cross</option><option value="solid">&#9632; Solid</option><option value="dots">&#10247; Dots</option><option value="none">None (fill off)</option>
       </select>
+    </div>
+    <div id="measureWrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:#aaa">
+      <span id="measureNote">No scale &mdash; drag a line along a known distance to set it</span>
+      <button class="btn" id="measureClearScale" style="display:none">Clear scale</button>
     </div>
     <button class="btn info" id="btnDetails" disabled title="Zone / loop / device details">&#9432; Details</button>
     <button class="btn" id="btnRotate" disabled style="display:none" title="Rotate 90&deg;">&#10227;</button>
@@ -469,6 +473,15 @@
   </div>
 </div>
 
+<div class="modal" id="findModal">
+  <div class="modalbox" style="max-width:500px">
+    <h3>Find device</h3>
+    <input type="text" id="findInput" placeholder="Search zone, loop, device no., type or info&hellip;" style="width:100%;background:#1a1d21;border:1px solid #444;border-radius:6px;color:#e8e8e8;padding:9px;font-size:14px">
+    <div id="findResults" style="max-height:46vh;overflow:auto;margin-top:10px"></div>
+    <div class="row"><button class="btn" id="findClose">Close</button></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 
@@ -503,7 +516,8 @@ const TYPES = [
   { id:"window",   tab:"bldg", label:"Window",       glyph:"window",   text:"",      color:"#111111" },
   { id:"opening",  tab:"bldg", label:"Opening",      glyph:"opening",  text:"",      color:"#111111" },
   { id:"stair",    tab:"bldg", label:"Stairs",       glyph:"stair",    text:"",      color:"#111111" },
-  { id:"lstair",   tab:"bldg", label:"L Stairs",     glyph:"lstair",   text:"",      color:"#111111" }
+  { id:"lstair",   tab:"bldg", label:"L Stairs",     glyph:"lstair",   text:"",      color:"#111111" },
+  { id:"campin",   tab:"tools", label:"Photo pin",   glyph:"campin",   text:"",      color:"#0277bd" }
 ];
 const TYPE_MAP = {}; TYPES.forEach(t => TYPE_MAP[t.id] = t);
 const OLD_TYPE_MAP = { heat:"thermal", cheat:"cthermal" };
@@ -512,7 +526,9 @@ const TOOLS_TAB = [
   { id:"timer",  label:"Timer",       icon:"⏱" },
   { id:"meter",  label:"Sound meter", icon:"🎚" },
   { id:"camera", label:"Camera",      icon:"📷" },
-  { id:"photos", label:"Site photos", icon:"🖼" }
+  { id:"photos", label:"Site photos", icon:"🖼" },
+  { id:"find",    label:"Find device", icon:"🔎" },
+  { id:"measure", label:"Measure",     icon:"📏" }
 ];
 const MARKUP_TOOLS = [
   { id:"pen",     label:"Pen",         icon:"✏️" },
@@ -582,6 +598,10 @@ let sitePhotos = [];
 let levels = [];
 let curLevel = 0;
 let clipboardObjs = [];
+let curScaleMpp = null;          // metres per image pixel for the open level (persisted as level.scaleMpp)
+let measureStart = null, measureLive = null;   // measure tool state
+let flashSym = null;             // {o, until} — find-device flash
+let afterLevelSwitch = null;     // one-shot callback once switchLevel finishes loading
 
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
@@ -661,6 +681,7 @@ function symDims(o) {   // image-space width/height (before rotation)
   else if (t.glyph === "stair") { w = s * 1.8; h = s; }
   else if (t.glyph === "lstair") { w = s * 1.45; h = s * 1.45; }
   else if (t.glyph === "db") { w = s * 1.9; h = s * 1.15; }
+  else if (t.glyph === "campin") { w = s * 1.15; h = s * 1.5; }
   const rr = ((o.rot || 0) % 360) * Math.PI / 180;
   if (rr) {
     const ca = Math.abs(Math.cos(rr)), sa = Math.abs(Math.sin(rr));
@@ -983,6 +1004,25 @@ function drawSym(c, o, scale) {
     c.strokeStyle = "#ffffff"; c.lineWidth = r * 0.12; c.lineCap = "round";
     c.beginPath(); c.moveTo(-r * 0.3, -r * 0.52); c.lineTo(r * 0.3, -r * 0.52); c.stroke();
     c.beginPath(); c.moveTo(r * 0.05, -r * 0.45); c.lineTo(r * 0.42, -r * 0.2); c.stroke();
+  } else if (t.glyph === "campin") {
+    // map pin with a camera; the lens fills solid once a photo is attached
+    const r = s * 0.5;
+    c.fillStyle = col; c.strokeStyle = "#ffffff";
+    c.lineWidth = Math.max(1, s * 0.07);
+    c.beginPath();
+    c.arc(0, -s * 0.1, r, Math.PI * 0.82, Math.PI * 0.18);
+    c.lineTo(0, s * 0.75);
+    c.closePath();
+    c.fill(); c.stroke();
+    const cw = r * 1.1, ch = r * 0.78, cy = -s * 0.1;
+    c.fillStyle = "#ffffff";
+    c.beginPath();
+    if (c.roundRect) c.roundRect(-cw / 2, cy - ch / 2, cw, ch, r * 0.12); else c.rect(-cw / 2, cy - ch / 2, cw, ch);
+    c.fill();
+    c.fillRect(-cw * 0.18, cy - ch / 2 - r * 0.14, cw * 0.36, r * 0.16);
+    c.beginPath(); c.arc(0, cy, r * 0.26, 0, Math.PI * 2);
+    if (o.photo) { c.fillStyle = col; c.fill(); }
+    else { c.strokeStyle = col; c.lineWidth = Math.max(1, r * 0.14); c.stroke(); }
   }
   c.restore();
 
@@ -1024,8 +1064,8 @@ function drawSym(c, o, scale) {
     c.restore();
   }
 
-  // tested badge (test mode only)
-  if (activeTool === "test") {
+  // tested badge (test mode only) — photo pins aren't testable devices
+  if (activeTool === "test" && t.glyph !== "campin") {
     const d2 = symDims(o);
     const bx2 = x - (d2.w / 2) * scale, by2 = y - (d2.h / 2) * scale;
     const br2 = Math.max(6 * scale, o.size * scale * 0.22);
@@ -1824,6 +1864,49 @@ function draw() {
     ctx.strokeRect(mx, my, Math.abs(marquee.x2 - marquee.x1), Math.abs(marquee.y2 - marquee.y1));
     ctx.restore();
   }
+
+  // measure overlay (live drag + last measurement while the tool stays active)
+  if (measureLive) {
+    const x1 = measureLive.x1 * view.scale + view.x, y1 = measureLive.y1 * view.scale + view.y;
+    const x2 = measureLive.x2 * view.scale + view.x, y2 = measureLive.y2 * view.scale + view.y;
+    const dpx = Math.hypot(measureLive.x2 - measureLive.x1, measureLive.y2 - measureLive.y1);
+    const ang = Math.atan2(y2 - y1, x2 - x1);
+    ctx.save();
+    ctx.strokeStyle = "#00b8d4"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    [[x1, y1], [x2, y2]].forEach(pt => {
+      ctx.beginPath();
+      ctx.moveTo(pt[0] - 9 * Math.sin(ang), pt[1] + 9 * Math.cos(ang));
+      ctx.lineTo(pt[0] + 9 * Math.sin(ang), pt[1] - 9 * Math.cos(ang));
+      ctx.stroke();
+    });
+    const label = curScaleMpp ? fmtMetres(dpx * curScaleMpp) : "no scale set";
+    const mx2 = (x1 + x2) / 2, my2 = (y1 + y2) / 2 - 16;
+    ctx.font = "bold 14px system-ui, sans-serif";
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,40,48,0.85)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(mx2 - tw / 2 - 7, my2 - 12, tw + 14, 23, 6); else ctx.rect(mx2 - tw / 2 - 7, my2 - 12, tw + 14, 23);
+    ctx.fill();
+    ctx.fillStyle = "#7fe7f7"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(label, mx2, my2);
+    ctx.restore();
+  }
+
+  // find-device flash (pulsing ring)
+  if (flashSym && objects.includes(flashSym.o)) {
+    const fo = flashSym.o;
+    const ph2 = (Date.now() % 750) / 750;
+    const fd = symDims(fo);
+    const base = Math.max(fd.w, fd.h) * view.scale * 0.75;
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,23,68," + (1 - ph2).toFixed(3) + ")";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(fo.x * view.scale + view.x, fo.y * view.scale + view.y, base + ph2 * base * 1.2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   updateStatus();
 }
 
@@ -2286,7 +2369,11 @@ function entriesForTab(tab) {
     const ids = applyOrder(MODIFY_TOOLS.map(t => t.id), tab);
     return ids.map(id => ({ kind:"tool", t:MODIFY_TOOLS.find(m => m.id === id) })).filter(e => e.t);
   }
-  if (tab === "tools") return TOOLS_TAB.map(t => ({ kind:"tool", t }));
+  if (tab === "tools") {
+    const out = TOOLS_TAB.map(t => ({ kind:"tool", t }));
+    TYPES.filter(t => t.tab === "tools").forEach(t => out.push({ kind:"sym", t }));
+    return out;
+  }
   const ids = applyOrder(TYPES.filter(t => t.tab === tab).map(t => t.id), tab);
   const out = ids.map(id => ({ kind:"sym", t:TYPE_MAP[id] })).filter(e => e.t);
   if (tab === "fire") out.push({ kind:"tool", t:VESDAR_TOOL });
@@ -2330,6 +2417,7 @@ function buildPalette() {
       if (t.id === "meter") { openMeter(); return; }
       if (t.id === "timer") { openTimer(); return; }
       if (t.id === "photos") { openPhotosGallery(); return; }
+      if (t.id === "find") { openFind(); return; }
       if (t.id !== "hatch" && MODIFY_TOOLS.some(m => m.id === t.id)) { modifyAction(t.id); return; }
       setTool(t.id);
     };
@@ -2419,6 +2507,122 @@ document.querySelectorAll("#alignModal [data-al]").forEach(b => {
 });
 document.getElementById("alignClose").onclick = () => document.getElementById("alignModal").classList.remove("show");
 
+/* ---- Find device ---- */
+const findModalEl = document.getElementById("findModal");
+function findLevelSets() {
+  if (img) syncLevel();
+  if (levels.length) return levels.map((lv, i) => ({ name:lv.name || ("Level " + (i + 1)), li:i, objects:lv.objects || [] }));
+  return [{ name:"", li:0, objects:objects }];
+}
+function openFind() {
+  if (!img) { statusEl.textContent = "Load a plan first"; return; }
+  findModalEl.classList.add("show");
+  const inp = document.getElementById("findInput");
+  inp.value = "";
+  renderFindResults("");
+  setTimeout(() => inp.focus(), 60);
+}
+function renderFindResults(q) {
+  const wrap = document.getElementById("findResults");
+  const terms = String(q || "").toLowerCase().split(/\s+/).filter(Boolean);
+  const out = [];
+  findLevelSets().forEach(set => {
+    set.objects.forEach(o => {
+      if (o.kind !== "sym") return;
+      const t = TYPE_MAP[o.type];
+      const hay = ((t ? t.label : o.type) + " " + o.type +
+        (o.zone ? " z" + o.zone + " zone " + o.zone : "") +
+        (o.loop ? " l" + o.loop + " loop " + o.loop : "") +
+        (o.dev ? " d" + o.dev + " dev " + o.dev + " device " + o.dev : "") +
+        " " + (o.info || "")).toLowerCase();
+      if (terms.every(term => hay.includes(term))) out.push({ o:o, set:set });
+    });
+  });
+  if (!out.length) {
+    wrap.innerHTML = '<p style="font-size:13px;color:#888;padding:6px 2px">No matching devices on this plan.</p>';
+    return;
+  }
+  wrap.innerHTML = "";
+  out.slice(0, 60).forEach(en => {
+    const o = en.o, t = TYPE_MAP[o.type];
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:9px;padding:7px;border:1px solid #3a3f46;border-radius:8px;margin-bottom:6px;cursor:pointer;background:#1f2328";
+    const ic = document.createElement("canvas");
+    ic.style.cssText = "width:34px;height:34px;flex:0 0 auto";
+    drawPalIcon(ic, o.type);
+    const parts = [];
+    if (o.zone) parts.push("Z" + o.zone);
+    if (o.loop) parts.push("L" + o.loop);
+    if (o.dev) parts.push("D" + o.dev);
+    const sub = String(o.info || "").replace(/&/g, "&amp;").replace(/</g, "&lt;") +
+      (levels.length > 1 && en.set.name ? (o.info ? " · " : "") + en.set.name : "");
+    const info = document.createElement("div");
+    info.style.cssText = "flex:1;min-width:0;font-size:13px";
+    info.innerHTML = '<div style="font-weight:600">' + (t ? t.label : o.type) +
+      (parts.length ? ' <span style="color:#8fd3e8">' + parts.join("·") + '</span>' : '') + '</div>' +
+      (sub ? '<div style="color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + sub + '</div>' : '');
+    row.appendChild(ic); row.appendChild(info);
+    row.onclick = () => {
+      findModalEl.classList.remove("show");
+      if (en.set.li !== curLevel && levels.length > 1) {
+        afterLevelSwitch = () => zoomFlashDevice(o);
+        switchLevel(en.set.li);
+      } else {
+        zoomFlashDevice(o);
+      }
+    };
+    wrap.appendChild(row);
+  });
+  if (out.length > 60) {
+    const more = document.createElement("p");
+    more.style.cssText = "font-size:12px;color:#888;padding:4px 2px";
+    more.textContent = (out.length - 60) + " more — keep typing to narrow it down.";
+    wrap.appendChild(more);
+  }
+}
+document.getElementById("findInput").addEventListener("input", e => renderFindResults(e.target.value));
+document.getElementById("findClose").onclick = () => findModalEl.classList.remove("show");
+function zoomFlashDevice(o) {
+  const r = stage.getBoundingClientRect();
+  const sc = Math.min(6, Math.max(view.scale, 90 / Math.max(12, o.size || 24)));
+  view.scale = sc;
+  view.x = r.width / 2 - o.x * sc;
+  view.y = r.height / 2 - o.y * sc;
+  flashSym = { o:o, until:Date.now() + 2600 };
+  (function pulse() {
+    if (flashSym && Date.now() < flashSym.until) { requestDraw(); requestAnimationFrame(pulse); }
+    else { flashSym = null; requestDraw(); }
+  })();
+}
+
+/* ---- Measure / per-level scale ---- */
+function fmtMetres(m) {
+  if (!isFinite(m)) return "?";
+  if (m < 1) return (m * 100).toFixed(0) + " cm";
+  return (m >= 100 ? m.toFixed(0) : m >= 10 ? m.toFixed(1) : m.toFixed(2)) + " m";
+}
+function refreshMeasureNote() {
+  const note = document.getElementById("measureNote");
+  const clr = document.getElementById("measureClearScale");
+  if (!note) return;
+  if (curScaleMpp) {
+    note.textContent = "Scale set (1 m = " + Math.round(1 / curScaleMpp) + " px)" + (levels.length > 1 ? " on this level" : "") + " — drag to measure";
+    clr.style.display = "inline-block";
+  } else {
+    note.textContent = "No scale — drag a line along a known distance to set it";
+    clr.style.display = "none";
+  }
+}
+document.getElementById("measureClearScale").onclick = () => {
+  if (!window.confirm("Clear the scale for this level? The next measured line will ask for a known distance again.")) return;
+  curScaleMpp = null;
+  measureLive = null;
+  if (img) syncLevel();
+  scheduleAutosave();
+  refreshMeasureNote();
+  draw();
+};
+
 function updateTestCounter() {
   const el = document.getElementById("testCounter");
   const cbEl = document.getElementById("testCounterOn");
@@ -2427,7 +2631,7 @@ function updateTestCounter() {
     const tb = document.getElementById("topbar");
     el.style.top = (document.body.classList.contains("focusmode") ? 0 : (tb ? tb.offsetHeight : 44)) + "px";
   }
-  const syms = objects.filter(o => o.kind === "sym");
+  const syms = objects.filter(o => o.kind === "sym" && o.type !== "campin");
   const done = syms.filter(o => (o.ty || []).includes(+testYearSel)).length;
   el.textContent = "\u2713 " + done + " / " + syms.length + " tested (" + testYearSel + (levels.length > 1 ? ", this level" : "") + ")";
   el.style.display = "block";
@@ -2444,6 +2648,9 @@ function setTool(id) {
   }
   document.getElementById("hatchWrap").style.display = id === "hatch" ? "flex" : "none";
   if (id === "hatch") document.getElementById("hatchStyleSel").value = hatchStyle;
+  document.getElementById("measureWrap").style.display = id === "measure" ? "flex" : "none";
+  if (id === "measure") refreshMeasureNote();
+  else { measureStart = null; measureLive = null; }
   document.getElementById("mode-pan").classList.toggle("active", id === "pan");
   document.getElementById("mode-select").classList.toggle("active", id === "select");
   document.getElementById("mode-test").classList.toggle("active", id === "test");
@@ -2708,7 +2915,7 @@ function setImage(im, dataUrl, keepObjects, keepView) {
   clearSelection();
   document.getElementById("dropHint").classList.add("hidden");
   if (keepView) draw(); else fitView();
-  if (!keepObjects) { levels = [{ name:"Level 1", image:imgDataUrl, pageBaseH:pageBaseH, objects:objects }]; curLevel = 0; }
+  if (!keepObjects) { curScaleMpp = null; measureLive = null; levels = [{ name:"Level 1", image:imgDataUrl, pageBaseH:pageBaseH, objects:objects, scaleMpp:null }]; curLevel = 0; }
   else syncLevel();
   refreshLevelSel();
   scheduleAutosave();
@@ -2928,7 +3135,7 @@ function loadProjectFile(file) {
         objects = lv.objects || [];
         if (typeof proj.labelsOn === "boolean") { labelsOn = proj.labelsOn; refreshLabelsBtn(); }
         siteNotes = proj.siteNotes || "";
-        pageBaseH = lv.pageBaseH || null;
+        pageBaseH = lv.pageBaseH || null; curScaleMpp = lv.scaleMpp || null;
         sitePhotos = proj.sitePhotos || [];
         undoStack = []; redoStack = [];
         currentProjId = null;
@@ -3054,7 +3261,7 @@ async function tryRestoreAutosave() {
       objects = lv.objects || [];
       if (typeof a.labelsOn === "boolean") { labelsOn = a.labelsOn; refreshLabelsBtn(); }
       siteNotes = a.siteNotes || "";
-      pageBaseH = lv.pageBaseH || null;
+      pageBaseH = lv.pageBaseH || null; curScaleMpp = lv.scaleMpp || null;
       sitePhotos = a.sitePhotos || [];
       setImage(im, lv.image, true);
       lastSaveNote = "Restored autosave from " + new Date(a.t).toTimeString().slice(0, 5); updateStatus();
@@ -3131,7 +3338,7 @@ async function openPlan(id) {
     objects = lv.objects || [];
     labelsOn = d.labelsOn !== false; refreshLabelsBtn();
     siteNotes = d.siteNotes || "";
-    pageBaseH = lv.pageBaseH || null;
+    pageBaseH = lv.pageBaseH || null; curScaleMpp = lv.scaleMpp || null;
     sitePhotos = d.sitePhotos || [];
     undoStack = []; redoStack = [];
     fileHandle = null;
@@ -3150,6 +3357,7 @@ document.getElementById("btnNew").onclick = () => {
   undoStack = []; redoStack = [];
   siteNotes = ""; pageBaseH = null; sitePhotos = [];
   levels = []; curLevel = 0; refreshLevelSel();
+  curScaleMpp = null; measureStart = null; measureLive = null; flashSym = null;
   currentProjId = null; fileHandle = null;
   document.getElementById("dropHint").classList.remove("hidden");
   idbDel("autosave").catch(() => {});
@@ -3183,7 +3391,7 @@ function syncLevel() {
   if (!img) return;
   if (!levels.length) levels.push({ name:"Level 1" });
   levels[curLevel] = { name:levels[curLevel] ? levels[curLevel].name : "Level " + (curLevel + 1),
-                       image:imgDataUrl, pageBaseH:pageBaseH, objects:objects };
+                       image:imgDataUrl, pageBaseH:pageBaseH, objects:objects, scaleMpp:curScaleMpp };
 }
 function refreshLevelSel() {
   const sel = document.getElementById("levelSel");
@@ -3205,7 +3413,7 @@ function switchLevel(i) {
   const im = new Image();
   im.onload = () => {
     objects = lv.objects || [];
-    pageBaseH = lv.pageBaseH || null;
+    pageBaseH = lv.pageBaseH || null; curScaleMpp = lv.scaleMpp || null;
     img = im; imgDataUrl = lv.image;
     clearSelection();
     undoStack = []; redoStack = [];
@@ -3213,6 +3421,8 @@ function switchLevel(i) {
     fitView();
     refreshLevelSel();
     scheduleAutosave();
+    if (typeof refreshMeasureNote === "function") refreshMeasureNote();
+    if (typeof afterLevelSwitch === "function") { const f = afterLevelSwitch; afterLevelSwitch = null; f(); }
   };
   im.src = lv.image;
 }
@@ -3293,6 +3503,7 @@ document.getElementById("levelInput").addEventListener("change", e => {
         lvs.forEach(lv => {
           levels.push({ name:lv.name || ("Level " + (levels.length + 1)), image:lv.image,
                         pageBaseH:lv.pageBaseH != null ? lv.pageBaseH : null,
+                        scaleMpp:lv.scaleMpp != null ? lv.scaleMpp : null,
                         objects:migrate(JSON.parse(JSON.stringify(lv.objects || []))) });
         });
         curLevel = -1;
@@ -3820,6 +4031,13 @@ cv.addEventListener("pointerdown", e => {
     return;
   }
 
+  if (activeTool === "measure") {
+    measureStart = ip;
+    measureLive = null;
+    dragMode = "measure";
+    return;
+  }
+
   if (activeTool === "pen" || activeTool === "hl") {
     pushUndo();
     currentStroke = {
@@ -3988,6 +4206,13 @@ cv.addEventListener("pointermove", e => {
     return;
   }
 
+  if (dragMode === "measure" && measureStart) {
+    const ep = e.shiftKey ? snap45(measureStart.x, measureStart.y, ip.x, ip.y) : ip;
+    measureLive = { x1:measureStart.x, y1:measureStart.y, x2:ep.x, y2:ep.y };
+    requestDraw();
+    return;
+  }
+
   if (dragMode === "draw" && currentStroke) {
     const last = currentStroke.points[currentStroke.points.length - 1];
     if (Math.hypot(ip.x - last.x, ip.y - last.y) > 1.5 / view.scale) {
@@ -4076,6 +4301,26 @@ function endPointer(e) {
     dragMode = null;
     scheduleAutosave();
     updateSelButtons();
+    draw();
+    return;
+  }
+
+  if (dragMode === "measure") {
+    dragMode = null; measureStart = null;
+    if (measureLive) {
+      const dpx = Math.hypot(measureLive.x2 - measureLive.x1, measureLive.y2 - measureLive.y1);
+      if (!moved || dpx * view.scale < 8) { measureLive = null; }
+      else if (!curScaleMpp) {
+        const ans = window.prompt("Set the scale — how long is this line in real life?\nEnter metres (e.g. 10 or 3.6):");
+        const m = parseFloat(ans);
+        if (ans != null && isFinite(m) && m > 0) {
+          curScaleMpp = m / dpx;
+          syncLevel();
+          scheduleAutosave();
+          refreshMeasureNote();
+        } else { measureLive = null; }
+      }
+    }
     draw();
     return;
   }
@@ -4173,7 +4418,7 @@ function endPointer(e) {
   if (dragMode === "testTapOrPan") {
     if (!moved) {
       const hit = hitObject(p.x, p.y);
-      if (hit && hit.kind === "sym") {
+      if (hit && hit.kind === "sym" && hit.type !== "campin") {
         pushUndo();
         hit.ty = hit.ty || [];
         const i = hit.ty.indexOf(testYearSel);

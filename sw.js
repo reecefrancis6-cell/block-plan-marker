@@ -1,4 +1,4 @@
-const CACHE = "bpm-v27";
+const CACHE = "bpm-v28";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png", "./pdf.min.js", "./pdf.worker.min.js"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
