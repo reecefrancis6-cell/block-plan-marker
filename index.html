@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Block Plan">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#23272d">
-<title>Block Plan Marker — Wormald</title>
+<title>Block Plan Marker</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { height:100%; overflow:hidden; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:#1a1d21; color:#e8e8e8; }
@@ -131,7 +131,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.22 beta</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.23 beta</span></span>
     <button class="btn" id="btnPlans" title="Plans saved on this device">&#9776; Plans</button>
     <button class="btn" id="btnNew" title="Start a new plan">&#65291; New</button>
     <button class="btn" id="btnOpenProj" title="Open a PDF plan or saved project">&#128194; Open</button>
@@ -4247,6 +4247,7 @@ resizeCanvas();
 tryRestoreAutosave();
 </script>
 <script>
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("./sw.js");
 }
