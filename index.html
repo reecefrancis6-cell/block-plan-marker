@@ -134,7 +134,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.29 beta</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.30 beta</span></span>
     <button class="btn" id="btnPlans" title="Plans saved on this device">&#9776; Plans</button>
     <button class="btn" id="btnNew" title="Start a new plan">&#65291; New</button>
     <button class="btn" id="btnOpenProj" title="Open a PDF plan or saved project">&#128194; Open</button>
@@ -3086,7 +3086,7 @@ function canShareFile(file) {
 function deliverFile(blob, name, mime) {
   const file = new File([blob], name, { type: mime });
   if (canShareFile(file)) {
-    navigator.share({ files: [file], title: name }).catch(() => {});
+    navigator.share({ files: [file] }).catch(() => {});   // no title: iOS saves it as a stray .txt beside the file
     return;
   }
   const url = URL.createObjectURL(blob);
@@ -3143,7 +3143,12 @@ async function saveProject() {
       }
     }
   }
-  deliverFile(projectBlob(), name, "application/json");
+  // iPad / share-sheet path: let the user name the file (share sheet offers no rename)
+  let nm = prompt("File name for the project:", name);
+  if (nm === null) return;
+  nm = nm.trim() || name;
+  if (!/\.json$/i.test(nm)) nm += ".json";
+  deliverFile(projectBlob(), nm, "application/json");
   noteSaved("Exported");
 }
 document.getElementById("btnSaveProj").onclick = saveProject;
