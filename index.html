@@ -134,7 +134,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.33 beta</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.34 beta</span></span>
     <button class="btn" id="btnPlans" title="Plans saved on this device">&#9776; Plans</button>
     <button class="btn" id="btnNew" title="Start a new plan">&#65291; New</button>
     <button class="btn" id="btnOpenProj" title="Open a PDF plan or saved project">&#128194; Open</button>
@@ -3108,17 +3108,43 @@ function isMobileShare() {
 function canShareFile(file) {
   return isMobileShare() && navigator.canShare && navigator.canShare({ files: [file] });
 }
-function deliverFile(blob, name, mime) {
-  const file = new File([blob], name, { type: mime });
-  if (canShareFile(file)) {
-    navigator.share({ files: [file] }).catch(() => {});   // no title: iOS saves it as a stray .txt beside the file
-    return;
-  }
+function dlAnchor(blob, name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+function deliverFile(blob, name, mime) {
+  const file = new File([blob], name, { type: mime });
+  if (canShareFile(file)) {
+    // no title: iOS saves it as a stray .txt beside the file. If iOS blocks the share
+    // sheet (stale tap after a dialog), fall back to a plain download so the save is
+    // never silently lost (iPad/iPhone Save As fix, V1.0)
+    navigator.share({ files: [file] }).catch(err => { if (!err || err.name !== "AbortError") dlAnchor(blob, name); });
+    return;
+  }
+  dlAnchor(blob, name);
+}
+function askFileName(def, cb) {
+  // in-page replacement for prompt(): the Save tap is a FRESH user gesture, so the
+  // share sheet that follows is allowed (a prompt() here was eating the gesture and
+  // iOS silently refused to open the share sheet -> "Save As does nothing")
+  const d = document.createElement("div");
+  d.style.cssText = "position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px";
+  d.innerHTML = '<div style="background:#23272d;color:#eee;border-radius:12px;padding:18px 18px 14px;max-width:420px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.5)">' +
+    '<div style="font-weight:700;margin-bottom:8px;font-size:15px">File name</div>' +
+    '<input id="askNmIn" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #4a5057;background:#1a1d21;color:#eee;font-size:15px">' +
+    '<div style="display:flex;gap:8px;margin-top:12px">' +
+    '<button id="askNmX" style="flex:1;padding:10px;border-radius:8px;border:1px solid #4a5057;background:#2c3138;color:#ddd;font-size:14px">Cancel</button>' +
+    '<button id="askNmGo" style="flex:2;padding:10px;border-radius:8px;border:0;background:#0e7c8c;color:#fff;font-weight:700;font-size:14px">Save</button></div></div>';
+  document.body.appendChild(d);
+  const inp = d.querySelector("#askNmIn");
+  inp.value = def || "";
+  try { inp.focus(); inp.setSelectionRange(0, inp.value.replace(/\.[a-z0-9]+$/i, "").length); } catch (e) {}
+  d.querySelector("#askNmX").onclick = () => d.remove();
+  d.querySelector("#askNmGo").onclick = () => { const nm = inp.value.trim() || def; d.remove(); cb(nm); };
+  inp.onkeydown = ev => { if (ev.key === "Enter") d.querySelector("#askNmGo").onclick(); };
 }
 
 function projectBlob() {
@@ -3168,13 +3194,13 @@ async function saveProject() {
       }
     }
   }
-  // iPad / share-sheet path: let the user name the file (share sheet offers no rename)
-  let nm = prompt("File name for the project:", name);
-  if (nm === null) return;
-  nm = nm.trim() || name;
-  if (!/\.json$/i.test(nm)) nm += ".json";
-  deliverFile(projectBlob(), nm, "application/json");
-  noteSaved("Exported");
+  // iPad / share-sheet path: in-page name box - its Save tap is the fresh gesture the
+  // iOS share sheet needs (prompt() here made Save As silently do nothing on iPad/iPhone)
+  askFileName(name, nm => {
+    if (!/\.json$/i.test(nm)) nm += ".json";
+    deliverFile(projectBlob(), nm, "application/json");
+    noteSaved("Exported");
+  });
 }
 document.getElementById("btnSaveProj").onclick = saveProject;
 document.getElementById("btnSaveAs").onclick = () => { fileHandle = null; saveProject(); };
