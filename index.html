@@ -134,7 +134,7 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.35 beta</span></span>
+    <span class="title">BLOCK PLAN MARKER <span style="color:#888;font-weight:400;font-size:11px">v1.35.1 beta</span></span>
     <button class="btn" id="btnPlans" title="Plans saved on this device">&#9776; Plans</button>
     <button class="btn" id="btnNew" title="Start a new plan">&#65291; New</button>
     <button class="btn" id="btnOpenProj" title="Open a PDF plan or saved project">&#128194; Open</button>
@@ -394,7 +394,7 @@
     <div class="row" style="margin-top:12px"><button class="btn" id="battClose">Close</button></div>
   </div>
 </div>
-<div class="modal" id="annModal">
+<div class="modal" id="annModal" style="z-index:121">
   <div class="modalbox" style="max-width:560px;width:96vw;max-height:86vh;overflow-y:auto;text-align:left">
     <h3 style="margin-bottom:4px">&#128203; Fire Alarm Annuals converter</h3>
     <div style="font-size:12px;color:#999;margin-bottom:10px">Panel program report (PDF / text / CSV / xlsx) &rarr; populated "Fire Alarm Annuals 2026&ndash;2030" workbook. Everything stays on this device.</div>
@@ -5852,8 +5852,10 @@ async function annRefreshBase() {
   el.style.color = b && b.name ? "#7ddb8f" : "#999";
 }
 function annOpen() {
-  annRefreshBase();
-  document.getElementById("annModal").classList.add("show");
+  try {
+    annRefreshBase();
+    document.getElementById("annModal").classList.add("show");
+  } catch (err) { alert("Annuals converter could not open: " + (err && err.message ? err.message : err)); }
 }
 document.getElementById("annClose").onclick = () => document.getElementById("annModal").classList.remove("show");
 document.getElementById("annBasePick").onclick = () => document.getElementById("annBaseInput").click();
@@ -5922,13 +5924,19 @@ function annSetButtons() {
   document.getElementById("annPdf").disabled = !on;
 }
 function annSiteName() { return (document.getElementById("annSite").value || "").trim() || "Site"; }
+function annDataUrlBuf(du) {   // decode a data: URL without fetch() (older iOS Safari can't fetch data URLs)
+  const bin = atob(String(du).split(",")[1] || "");
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8.buffer;
+}
 document.getElementById("annXlsx").onclick = async () => {
   let b = null;
   try { b = await idbGet("annBase"); } catch (e) {}
   if (!b || !b.data) { alert("Choose the base workbook template first (step 1) — it is kept on this device and reused every time."); return; }
   if (typeof DecompressionStream === "undefined") { alert("This browser can't rebuild xlsx files (needs DecompressionStream) — use the PDF export or update the browser."); return; }
   try {
-    const buf = await (await fetch(b.data)).arrayBuffer();
+    const buf = annDataUrlBuf(b.data);
     const blob = await annBuildXlsx(buf, annSelected());
     deliverFile(blob, "Fire Alarm Annuals 2026-2030 - " + annSiteName() + " populated.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   } catch (err) { alert("Couldn't build the workbook: " + (err && err.message ? err.message : err)); }
